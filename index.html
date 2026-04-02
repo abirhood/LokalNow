@@ -38,14 +38,16 @@ const app  = initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const stor = getStorage(app);
 
-window._db   = db;
+window._db  = db;
 window._stor = stor;
-window._fs   = {
+// Firestore functions
+window._fs = {
   collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc,
   deleteDoc, query, orderBy, limit, onSnapshot, arrayUnion,
-  arrayRemove, serverTimestamp, where, increment, ref,
-  uploadBytes, getDownloadURL
+  arrayRemove, serverTimestamp, where, increment
 };
+// Storage functions — separate object to avoid any conflict
+window._storfn = { ref, uploadBytes, getDownloadURL };
 window._fbReady = true;
 </script>
 
@@ -1177,11 +1179,36 @@ function resizeImage(dataUrl, maxW, quality=0.78){
   });
 }
 
-// Upload a file to Firebase Storage, return download URL
+// Upload a file — tries Firebase Storage first, falls back to base64
+// Base64 fallback means profile pics always work even if Storage rules aren't set
 async function uploadToStorage(file, path){
-  const storRef = fs.ref(stor, path);
-  const snap = await fs.uploadBytes(storRef, file);
-  return await fs.getDownloadURL(snap.ref);
+  // Try Firebase Storage first
+  try{
+    const storfn  = window._storfn;
+    const storage = window._stor;
+    if(storfn && storage){
+      const storRef = storfn.ref(storage, path);
+      const snap    = await storfn.uploadBytes(storRef, file);
+      const url     = await storfn.getDownloadURL(snap.ref);
+      return url; // success — return the real CDN URL
+    }
+  }catch(storageError){
+    console.warn('Firebase Storage upload failed, using base64 fallback:', storageError.message);
+    // Fall through to base64 below
+  }
+  // Fallback: convert file to base64 and store directly in Firestore
+  // Works without any Storage setup. Fine for avatars (small files).
+  return await fileToBase64(file);
+}
+
+// Convert a File/Blob to a base64 data URL
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = e  => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1660,7 +1687,8 @@ async function submitPost(){
     $('fi-post').value='';
     setTimeout(()=>switchTab('feed'),700);
   }catch(e){
-    toast('⚠️ Could not upload post. Check your internet and try again.');
+    console.error('Post upload error:', e);
+    toast('⚠️ Could not post: ' + (e.message||'unknown error'));
     btn.textContent='Share Post ✓'; btn.disabled=false;
     prog.style.display='none';
   }
@@ -1813,10 +1841,13 @@ async function saveAvatar(){
     CU={...CU,avatar_url:url};
     localStorage.setItem('ln_sess',JSON.stringify(CU));
     closeModal('avatar-modal');
-    toast('✅ Profile photo updated!');
+    // Tell user if it used Storage or base64 fallback
+    const method = url.startsWith('data:') ? ' (saved locally)' : '';
+    toast('✅ Profile photo updated!' + method);
     loadProfile();
   }catch(e){
-    toast('Could not upload photo. Check your internet.');
+    console.error('Avatar upload error:', e);
+    toast('Upload failed: ' + (e.message||'unknown error'));
     btn.textContent='Save Photo ✓'; btn.disabled=false;
   }
 }
@@ -1900,7 +1931,7 @@ async function submitBook(){
 function boot(){
   db   = window._db;
   fs   = window._fs;
-  stor = window._stor;
+  stor = window._stor;  // still kept for any legacy refs
 
   // Try to restore session
   try{
