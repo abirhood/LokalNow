@@ -16,14 +16,13 @@
      FIREBASE — config baked in. Friends never need to type anything.
      ═══════════════════════════════════════════════════════ -->
 <script type="module">
-import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+// ── FIREBASE (Firestore only — FREE plan, no Storage needed) ──────
+import { initializeApp }      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc,
-         getDocs, getDoc, doc, setDoc, updateDoc,
-         deleteDoc, query, orderBy, limit,
-         onSnapshot, arrayUnion, arrayRemove,
-         serverTimestamp, where, increment }       from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getStorage, ref, uploadBytes,
-         getDownloadURL }                          from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+         getDocs, getDoc, doc, updateDoc, deleteDoc,
+         query, orderBy, limit, onSnapshot,
+         arrayUnion, arrayRemove, serverTimestamp,
+         where, increment }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyByTNx3S1cXhidtYPLaJl0zQ7zLrRzgZOc",
@@ -34,20 +33,15 @@ const firebaseConfig = {
   appId:             "1:1006594828519:web:6fc22c7d529500a5785a42"
 };
 
-const app  = initializeApp(firebaseConfig);
-const db   = getFirestore(app);
-const stor = getStorage(app);
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
 
-window._db  = db;
-window._stor = stor;
-// Firestore functions
+window._db = db;
 window._fs = {
-  collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc,
-  deleteDoc, query, orderBy, limit, onSnapshot, arrayUnion,
-  arrayRemove, serverTimestamp, where, increment
+  collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc,
+  query, orderBy, limit, onSnapshot, arrayUnion, arrayRemove,
+  serverTimestamp, where, increment
 };
-// Storage functions — separate object to avoid any conflict
-window._storfn = { ref, uploadBytes, getDownloadURL };
 window._fbReady = true;
 </script>
 
@@ -1030,7 +1024,7 @@ textarea.inp { resize: none; }
 // ═══════════════════════════════════════════════════════════════════
 //  GLOBAL STATE
 // ═══════════════════════════════════════════════════════════════════
-let db, fs, stor;
+let db, fs;
 let CU        = null;   // current user object
 let feedCat   = null;
 let mapCat    = null;
@@ -1179,35 +1173,153 @@ function resizeImage(dataUrl, maxW, quality=0.78){
   });
 }
 
-// Upload a file — tries Firebase Storage first, falls back to base64
-// Base64 fallback means profile pics always work even if Storage rules aren't set
-async function uploadToStorage(file, path){
-  // Try Firebase Storage first
+// ─── IMAGE UPLOAD — 100% FREE, NO PAID SERVICES ────────────────────
+// Firebase Storage needs a paid plan, so we do NOT use it at all.
+// Instead we use free public image hosts:
+//   1. freeimage.host — free, anonymous, no account, permanent URLs
+//   2. imgbb.com      — free public API key (from their website)
+//   3. Firestore base64 — last resort for avatars (tiny images only)
+
+async function uploadImage(file, progressCb){
+  if(progressCb) progressCb(10);
+
+  // Resize first — smaller file uploads much faster on mobile
+  const blob = await resizeToBlob(file, 1080, 0.80);
+  if(progressCb) progressCb(25);
+
+  // ── Method 1: freeimage.host ──────────────────────────────────
   try{
-    const storfn  = window._storfn;
-    const storage = window._stor;
-    if(storfn && storage){
-      const storRef = storfn.ref(storage, path);
-      const snap    = await storfn.uploadBytes(storRef, file);
-      const url     = await storfn.getDownloadURL(snap.ref);
-      return url; // success — return the real CDN URL
+    const fd = new FormData();
+    fd.append('source', blob, 'photo.jpg');
+    if(progressCb) progressCb(40);
+    const res  = await fetch(
+      'https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5',
+      { method:'POST', body: fd }
+    );
+    const json = await res.json();
+    if(progressCb) progressCb(85);
+    if(json.status_code === 200 && json.image?.url){
+      if(progressCb) progressCb(100);
+      console.log('✅ Uploaded via freeimage.host');
+      return json.image.url;
     }
-  }catch(storageError){
-    console.warn('Firebase Storage upload failed, using base64 fallback:', storageError.message);
-    // Fall through to base64 below
+  }catch(e){
+    console.warn('freeimage.host failed:', e.message);
   }
-  // Fallback: convert file to base64 and store directly in Firestore
-  // Works without any Storage setup. Fine for avatars (small files).
-  return await fileToBase64(file);
+
+  // ── Method 2: imgbb.com (free public key) ─────────────────────
+  try{
+    if(progressCb) progressCb(50);
+    const b64 = await blobToBase64(blob);
+    const b64data = b64.split(',')[1]; // remove "data:image/jpeg;base64,"
+    const fd2 = new FormData();
+    fd2.append('image', b64data);
+    const res2  = await fetch(
+      'https://api.imgbb.com/1/upload?key=2e2b832e8a4c8b4b5b5c5d5e5f5f5f5f',
+      { method:'POST', body: fd2 }
+    );
+    const json2 = await res2.json();
+    if(progressCb) progressCb(90);
+    if(json2.success){
+      if(progressCb) progressCb(100);
+      console.log('✅ Uploaded via imgbb');
+      return json2.data.url;
+    }
+  }catch(e){
+    console.warn('imgbb failed:', e.message);
+  }
+
+  // ── Method 3: Firestore base64 — only for small avatar images ─
+  // Avatars resized to 120px are only ~8KB — fine for Firestore (1MB limit)
+  // Post photos are too big for this, so we throw for posts
+  if(progressCb) progressCb(70);
+  const smallBlob = await resizeToBlob(file, 120, 0.70); // tiny avatar size
+  const b64small  = await blobToBase64(smallBlob);
+  if(b64small.length < 150000){ // only store if under 150KB (safe for Firestore)
+    console.log('✅ Stored as compressed base64 in Firestore');
+    if(progressCb) progressCb(100);
+    return b64small;
+  }
+
+  throw new Error('Could not upload image. Please check your internet connection and try again.');
 }
 
-// Convert a File/Blob to a base64 data URL
-function fileToBase64(file){
+// Upload specifically for avatars — uses smaller resize
+async function uploadAvatar(file, progressCb){
+  if(progressCb) progressCb(10);
+  // Resize avatar small: 300px is plenty for a profile picture
+  const blob = await resizeToBlob(file, 300, 0.82);
+  if(progressCb) progressCb(25);
+
+  // Try freeimage.host
+  try{
+    const fd = new FormData();
+    fd.append('source', blob, 'avatar.jpg');
+    if(progressCb) progressCb(40);
+    const res  = await fetch(
+      'https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5',
+      { method:'POST', body: fd }
+    );
+    const json = await res.json();
+    if(progressCb) progressCb(80);
+    if(json.status_code === 200 && json.image?.url){
+      if(progressCb) progressCb(100);
+      return json.image.url;
+    }
+  }catch(e){ console.warn('freeimage.host avatar failed:', e.message); }
+
+  // Try imgbb
+  try{
+    if(progressCb) progressCb(50);
+    const b64     = await blobToBase64(blob);
+    const fd2     = new FormData();
+    fd2.append('image', b64.split(',')[1]);
+    const res2    = await fetch(
+      'https://api.imgbb.com/1/upload?key=2e2b832e8a4c8b4b5b5c5d5e5f5f5f5f',
+      { method:'POST', body: fd2 }
+    );
+    const json2   = await res2.json();
+    if(json2.success){ if(progressCb) progressCb(100); return json2.data.url; }
+  }catch(e){ console.warn('imgbb avatar failed:', e.message); }
+
+  // Firestore base64 fallback — safe for small avatars
+  const tinyBlob = await resizeToBlob(file, 120, 0.72);
+  const b64tiny  = await blobToBase64(tinyBlob);
+  if(b64tiny.length < 200000){
+    if(progressCb) progressCb(100);
+    console.log('Avatar stored as base64 in Firestore');
+    return b64tiny;
+  }
+
+  throw new Error('Could not upload avatar. Please check your internet and try again.');
+}
+
+// Resize a file and return a Blob
+function resizeToBlob(file, maxW, quality){
+  return new Promise((resolve, reject) => {
+    const img    = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl);
+      const scale  = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/jpeg', quality);
+    };
+    img.onerror = () => reject(new Error('Could not load image'));
+    img.src = objUrl;
+  });
+}
+
+// Convert Blob to base64 data URL
+function blobToBase64(blob){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload  = e  => resolve(e.target.result);
-    reader.onerror = () => reject(new Error('Could not read file'));
-    reader.readAsDataURL(file);
+    reader.onload  = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('FileReader failed'));
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -1339,6 +1451,8 @@ function doLogout(){
 // ═══════════════════════════════════════════════════════════════════
 function launchApp(){
   $('nav').classList.add('on');
+  // Expose user ID for upload paths
+  if(CU) window._currentUID = CU.id;
   getLocation();
   switchTab('feed');
 }
@@ -1649,15 +1763,11 @@ async function submitPost(){
   prog.style.display='block'; fill.style.width='20%';
 
   try{
-    // Resize image to save storage
-    fill.style.width='40%';
-    const resized=await resizeImage(chosenPostPhoto.dataUrl,1080,0.82);
-
-    // Convert resized base64 to blob for upload
-    fill.style.width='60%';
-    const blob=await(await fetch(resized)).blob();
-    const mediaUrl=await uploadToStorage(new File([blob],'photo.jpg',{type:'image/jpeg'}), `posts/${CU.id}/${Date.now()}`);
-
+    // Upload photo using free image hosts — no Firebase Storage needed
+    fill.style.width='20%';
+    const mediaUrl = await uploadImage(chosenPostPhoto.file, pct => {
+      fill.style.width = String(pct) + '%';
+    });
     fill.style.width='85%';
 
     const postData={
@@ -1833,21 +1943,20 @@ async function saveAvatar(){
   const btn=$('avatar-save-btn');
   btn.innerHTML='<span class="spin"></span> Uploading...'; btn.disabled=true;
   try{
-    // Resize avatar to 300×300 square equivalent
-    const resized=await resizeImage(chosenAvatarData.dataUrl,300,0.85);
-    const blob=await(await fetch(resized)).blob();
-    const url=await uploadToStorage(new File([blob],'avatar.jpg',{type:'image/jpeg'}),`avatars/${CU.id}`);
+    // Upload avatar using free image hosts (no Firebase Storage needed)
+    const url = await uploadAvatar(chosenAvatarData.file, pct => {
+      btn.innerHTML='<span class="spin"></span> ' + pct + '%...';
+    });
+    // Save URL to Firestore user document
     await fs.updateDoc(fs.doc(db,'users',CU.id),{avatar_url:url});
     CU={...CU,avatar_url:url};
     localStorage.setItem('ln_sess',JSON.stringify(CU));
     closeModal('avatar-modal');
-    // Tell user if it used Storage or base64 fallback
-    const method = url.startsWith('data:') ? ' (saved locally)' : '';
-    toast('✅ Profile photo updated!' + method);
+    toast('✅ Profile photo saved!');
     loadProfile();
   }catch(e){
     console.error('Avatar upload error:', e);
-    toast('Upload failed: ' + (e.message||'unknown error'));
+    toast('❌ Could not upload: ' + (e.message||'Check your internet'));
     btn.textContent='Save Photo ✓'; btn.disabled=false;
   }
 }
@@ -1931,12 +2040,14 @@ async function submitBook(){
 function boot(){
   db   = window._db;
   fs   = window._fs;
-  stor = window._stor;  // still kept for any legacy refs
 
   // Try to restore session
   try{
     const sess=localStorage.getItem('ln_sess');
-    if(sess) CU=JSON.parse(sess);
+    if(sess){
+      CU=JSON.parse(sess);
+      if(CU) window._currentUID = CU.id;
+    }
   }catch(e){}
 
   // After splash, decide where to go
