@@ -1192,147 +1192,88 @@ function resizeImage(dataUrl, maxW, quality=0.78){
   });
 }
 
-// ─── IMAGE UPLOAD — 100% FREE, NO PAID SERVICES ────────────────────
-// Firebase Storage needs a paid plan, so we do NOT use it at all.
-// Instead we use free public image hosts:
-//   1. freeimage.host — free, anonymous, no account, permanent URLs
-//   2. imgbb.com      — free public API key (from their website)
-//   3. Firestore base64 — last resort for avatars (tiny images only)
+// ─── IMAGE UPLOAD — INSTAGRAM-QUALITY, NO THIRD PARTY ──────────────
+// Photos are stored in Firestore as base64.
+// No external image host = no recompression = full quality preserved.
+// Instagram uses 1080px width, JPEG ~92% quality. We do the same.
 
+// Upload a post photo — returns base64 data URL stored in Firestore
 async function uploadImage(file, progressCb){
   if(progressCb) progressCb(10);
 
-  // Resize first — smaller file uploads much faster on mobile
-  const blob = await resizeToBlob(file, 1080, 0.95);
-  if(progressCb) progressCb(25);
-
-  // ── Method 1: freeimage.host ──────────────────────────────────
-  try{
-    const fd = new FormData();
-    fd.append('source', blob, 'photo.jpg');
-    if(progressCb) progressCb(40);
-    const res  = await fetch(
-      'https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5',
-      { method:'POST', body: fd }
-    );
-    const json = await res.json();
-    if(progressCb) progressCb(85);
-    if(json.status_code === 200 && json.image?.url){
-      if(progressCb) progressCb(100);
-      console.log('✅ Uploaded via freeimage.host');
-      return json.image.url;
-    }
-  }catch(e){
-    console.warn('freeimage.host failed:', e.message);
-  }
-
-  // ── Method 2: imgbb.com (free public key) ─────────────────────
-  try{
-    if(progressCb) progressCb(50);
-    const b64 = await blobToBase64(blob);
-    const b64data = b64.split(',')[1]; // remove "data:image/jpeg;base64,"
-    const fd2 = new FormData();
-    fd2.append('image', b64data);
-    const res2  = await fetch(
-      'https://api.imgbb.com/1/upload?key=2e2b832e8a4c8b4b5b5c5d5e5f5f5f5f',
-      { method:'POST', body: fd2 }
-    );
-    const json2 = await res2.json();
-    if(progressCb) progressCb(90);
-    if(json2.success){
-      if(progressCb) progressCb(100);
-      console.log('✅ Uploaded via imgbb');
-      return json2.data.url;
-    }
-  }catch(e){
-    console.warn('imgbb failed:', e.message);
-  }
-
-  // ── Method 3: Firestore base64 — only for small avatar images ─
-  // Avatars resized to 120px are only ~8KB — fine for Firestore (1MB limit)
-  // Post photos are too big for this, so we throw for posts
+  // Step 1: Resize to 1080px wide max (Instagram standard width)
+  // Height is proportional — no cropping
+  const base64 = await resizeToBase64(file, 1080, 0.92);
   if(progressCb) progressCb(70);
-  const smallBlob = await resizeToBlob(file, 150, 0.88); // tiny avatar size
-  const b64small  = await blobToBase64(smallBlob);
-  if(b64small.length < 150000){ // only store if under 150KB (safe for Firestore)
-    console.log('✅ Stored as compressed base64 in Firestore');
-    if(progressCb) progressCb(100);
-    return b64small;
-  }
 
-  throw new Error('Could not upload image. Please check your internet connection and try again.');
-}
+  // Step 2: Check size — Firestore doc limit is 1MB (1,048,576 bytes)
+  // base64 string length × 0.75 = actual byte size
+  const byteSize = Math.round(base64.length * 0.75);
+  console.log('Photo size:', Math.round(byteSize/1024) + 'KB');
 
-// Upload specifically for avatars — uses smaller resize
-async function uploadAvatar(file, progressCb){
-  if(progressCb) progressCb(10);
-  // Resize avatar small: 300px is plenty for a profile picture
-  const blob = await resizeToBlob(file, 300, 0.92);
-  if(progressCb) progressCb(25);
-
-  // Try freeimage.host
-  try{
-    const fd = new FormData();
-    fd.append('source', blob, 'avatar.jpg');
-    if(progressCb) progressCb(40);
-    const res  = await fetch(
-      'https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5',
-      { method:'POST', body: fd }
-    );
-    const json = await res.json();
+  if(byteSize > 900000){
+    // Image still too large — compress a bit more
     if(progressCb) progressCb(80);
-    if(json.status_code === 200 && json.image?.url){
-      if(progressCb) progressCb(100);
-      return json.image.url;
-    }
-  }catch(e){ console.warn('freeimage.host avatar failed:', e.message); }
-
-  // Try imgbb
-  try{
-    if(progressCb) progressCb(50);
-    const b64     = await blobToBase64(blob);
-    const fd2     = new FormData();
-    fd2.append('image', b64.split(',')[1]);
-    const res2    = await fetch(
-      'https://api.imgbb.com/1/upload?key=2e2b832e8a4c8b4b5b5c5d5e5f5f5f5f',
-      { method:'POST', body: fd2 }
-    );
-    const json2   = await res2.json();
-    if(json2.success){ if(progressCb) progressCb(100); return json2.data.url; }
-  }catch(e){ console.warn('imgbb avatar failed:', e.message); }
-
-  // Firestore base64 fallback — safe for small avatars
-  const tinyBlob = await resizeToBlob(file, 150, 0.88);
-  const b64tiny  = await blobToBase64(tinyBlob);
-  if(b64tiny.length < 200000){
+    const smaller = await resizeToBase64(file, 1080, 0.82);
+    if(progressCb) progressCb(95);
     if(progressCb) progressCb(100);
-    console.log('Avatar stored as base64 in Firestore');
-    return b64tiny;
+    return smaller;
   }
 
-  throw new Error('Could not upload avatar. Please check your internet and try again.');
+  if(progressCb) progressCb(100);
+  return base64;
 }
 
-// Resize a file and return a Blob
-function resizeToBlob(file, maxW, quality){
+// Upload avatar — 400px, high quality
+async function uploadAvatar(file, progressCb){
+  if(progressCb) progressCb(20);
+  const base64 = await resizeToBase64(file, 400, 0.92);
+  if(progressCb) progressCb(90);
+  // Avatars are small — should always fit in Firestore
+  if(progressCb) progressCb(100);
+  return base64;
+}
+
+// Resize a file and return a base64 data URL (no Blob middleman)
+function resizeToBase64(file, maxWidth, quality){
   return new Promise((resolve, reject) => {
     const img    = new Image();
     const objUrl = URL.createObjectURL(file);
+
     img.onload = () => {
       URL.revokeObjectURL(objUrl);
-      const scale  = Math.min(1, maxW / img.width);
+
+      // Calculate new dimensions — maintain aspect ratio
+      let w = img.width;
+      let h = img.height;
+      if(w > maxWidth){
+        h = Math.round(h * maxWidth / w);
+        w = maxWidth;
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width  = Math.round(img.width  * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/jpeg', quality);
+      canvas.width  = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+
+      // Fill white background first (prevents transparency issues)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, w, h);
+
+      // Draw image
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Export as JPEG with chosen quality
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataUrl);
     };
-    img.onerror = () => reject(new Error('Could not load image'));
+
+    img.onerror = () => reject(new Error('Could not read image. Please try another photo.'));
     img.src = objUrl;
   });
 }
 
-// Convert Blob to base64 data URL
+// Helper — Blob to base64 (kept for compatibility)
 function blobToBase64(blob){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1788,12 +1729,11 @@ async function submitPost(){
   prog.style.display='block'; fill.style.width='20%';
 
   try{
-    // Upload photo using free image hosts — no Firebase Storage needed
+    // Resize to 1080px + encode at quality 0.92 — stored in Firestore (no recompression)
     fill.style.width='20%';
     const mediaUrl = await uploadImage(chosenPostPhoto.file, pct => {
       fill.style.width = String(pct) + '%';
     });
-    fill.style.width='85%';
 
     const postData={
       uid:CU.id, full_name:CU.full_name, username:CU.username,
@@ -1976,7 +1916,7 @@ async function saveAvatar(){
   const btn=$('avatar-save-btn');
   btn.innerHTML='<span class="spin"></span> Uploading...'; btn.disabled=true;
   try{
-    // Upload avatar using free image hosts (no Firebase Storage needed)
+    // Resize to 400px + encode at quality 0.92 — stored in Firestore (no recompression)
     const url = await uploadAvatar(chosenAvatarData.file, pct => {
       btn.innerHTML='<span class="spin"></span> ' + pct + '%...';
     });
