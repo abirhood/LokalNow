@@ -1509,10 +1509,6 @@ function waitForFirebase(attempt=0){
   else if(attempt<40){setTimeout(()=>waitForFirebase(attempt+1),150)}
   else{showPage('pg-login');toast('⚠️ Could not connect. Check your internet.')}
 }
-waitForFirebase();
-</script>
-</body>
-</html>
 // ═══════════════════════════════════════════════════════════════════
 //  PHOTO RATIO SYSTEM (Instagram-style)
 // ═══════════════════════════════════════════════════════════════════
@@ -1925,3 +1921,8 @@ async function checkUnreadNotifs(){
 }
 
 // Also send notification on like
+
+waitForFirebase();
+</script>
+</body>
+</html>
