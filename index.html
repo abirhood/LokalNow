@@ -1355,7 +1355,7 @@ async function openDMInbox(){
       fs.where('members','array-contains',CU.id),
       fs.orderBy('updated_at','desc'),fs.limit(30));
     const snap=await fs.getDocs(q);
-    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.<br>Go to someone's profile and tap Message!</p></div>';return;}
+    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.<br>Find a friend and send a message!</p></div>';return;}
     el.innerHTML='';
     snap.docs.forEach(d=>{
       const c={id:d.id,...d.data()};
@@ -1472,25 +1472,23 @@ function onBookFile(e){
 }
 
 function openBookReader(book){
-  const content=book.content||'';
+  var content=book.content||'';
   $('reader-title').textContent=book.title||'Book';
-  const body=$('reader-body');
+  var body=$('reader-body');
   if(!content&&!book.description){
-    body.innerHTML='<p style="color:var(--muted);text-align:center;padding:40px 0;">No readable content uploaded for this book yet.</p>';
+    body.innerHTML='<p style="color:var(--muted);text-align:center;padding:40px 0;">No content uploaded yet.</p>';
   } else if(content){
-    const html=content.split(/
-
-+/).map(p=>p.trim()).filter(p=>p).map(p=>{
-      if(p.startsWith('# '))return '<h1>'+esc(p.slice(2))+'</h1>';
-      if(p.startsWith('## '))return '<h2>'+esc(p.slice(3))+'</h2>';
-      return '<p>'+esc(p).replace(/
-/g,'<br>')+'</p>';
+    var paras=content.split('\n\n').map(function(p){return p.trim();}).filter(function(p){return p.length>0;});
+    var html=paras.map(function(p){
+      if(p.indexOf('# ')==0) return '<h1>'+esc(p.slice(2))+'</h1>';
+      if(p.indexOf('## ')==0) return '<h2>'+esc(p.slice(3))+'</h2>';
+      return '<p>'+esc(p).split('\n').join('<br>')+'</p>';
     }).join('');
-    body.innerHTML='<h1>'+esc(book.title)+'</h1>'
-      +(book.author_name?'<p style="color:var(--muted);font-size:13px;margin-bottom:24px;">by '+esc(book.author_name)+'</p>':'')
+    body.innerHTML='<h1>'+esc(book.title||'')+'</h1>'
+      +(book.author_name?'<p style="color:var(--muted);font-size:13px;margin-bottom:20px;">by '+esc(book.author_name)+'</p>':'')
       +html;
   } else {
-    body.innerHTML='<h1>'+esc(book.title)+'</h1><p>'+esc(book.description||'')+'</p>';
+    body.innerHTML='<h1>'+esc(book.title||'')+'</h1><p>'+esc(book.description||'')+'</p>';
   }
   navTo('pg-reader');
 }
