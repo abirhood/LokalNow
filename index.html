@@ -385,6 +385,24 @@ textarea.inp{resize:none}
 .lb-bg.on{display:flex}
 .lb-img{max-width:100%;max-height:100%;object-fit:contain}
 .lb-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;width:44px;height:44px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* ── FRIENDS PAGE ─────────────────────────────────── */
+.friend-item{display:flex;align-items:center;gap:12px;padding:13px 14px;background:#fff;border-bottom:1px solid var(--border);}
+.friend-avi{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;overflow:hidden;flex-shrink:0;}
+.friend-avi img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.friend-name{font-weight:700;font-size:14px;}
+.friend-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.friend-actions{display:flex;gap:7px;margin-left:auto;flex-shrink:0;}
+.fa-btn{padding:7px 12px;border-radius:9px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent;}
+.fa-btn.accept{background:var(--G);color:#fff;}
+.fa-btn.decline{background:var(--bg);color:var(--muted);border:1.5px solid var(--border);}
+.fa-btn.remove{background:var(--bg);color:var(--red);border:1.5px solid #ffc0c0;}
+.fa-btn.add{background:var(--G);color:#fff;}
+.fa-btn.pending{background:var(--bg);color:var(--muted);border:1.5px solid var(--border);}
+/* Privacy badge on post */
+.priv-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;margin-left:5px;}
+.priv-badge.friends{background:#e8f5ee;color:var(--G);}
+.priv-badge.public{background:#f0f4f1;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -520,7 +538,11 @@ textarea.inp{resize:none}
         </div>
       </div>
       <div class="lb">📍 <span id="loc-lbl">Detecting your location...</span></div>
-      <div class="scan-note">📸 Photos stored at <b>full quality</b> in your Firebase database — no third-party compression.</div>
+      <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;">
+      <button id="priv-public" onclick="setPrivacy('public')" style="flex:1;padding:11px 8px;border:none;background:var(--G);color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">🌍 Public</button>
+      <button id="priv-friends" onclick="setPrivacy('friends')" style="flex:1;padding:11px 8px;border:none;background:#fff;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">👥 Friends Only</button>
+    </div>
+    <div class="scan-note">📸 Photos stored at <b>full quality</b> in your Firebase database — no third-party compression.</div>
       <button class="btn" id="post-btn" onclick="submitPost()">Share Post ✓</button>
     </div>
   </div>
@@ -684,12 +706,27 @@ textarea.inp{resize:none}
   <img class="lb-img" id="lb-img" alt=""/>
 </div>
 
+<!-- FRIENDS PAGE -->
+<div class="page" id="pg-friends" style="flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-title">👥 Friends</div>
+  </div>
+  <div class="chips" id="friends-tabs" style="flex-shrink:0;">
+    <div class="chip on" onclick="setFriendsTab(this,'friends')">👥 My Friends</div>
+    <div class="chip" onclick="setFriendsTab(this,'requests')">📨 Requests <span id="req-count"></span></div>
+    <div class="chip" onclick="setFriendsTab(this,'sent')">📤 Sent</div>
+  </div>
+  <div class="scroll" id="friends-list">
+    <div class="empty"><div class="ei">👥</div><p>No friends yet.<br>Search for people and add them!</p></div>
+  </div>
+</div>
+
 <!-- BOTTOM NAV -->
 <nav class="nav" id="nav">
   <button class="nb on" id="nb-feed" onclick="switchTab('feed')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Feed</button>
   <button class="nb" id="nb-search" onclick="switchTab('search')"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Search</button>
   <button class="nb" id="nb-create" onclick="switchTab('create')"><div class="nb-circle"><svg viewBox="0 0 24 24" stroke-width="2.5" style="width:22px;height:22px;"><path d="M12 5v14M5 12h14"/></svg></div>Post</button>
-  <button class="nb" id="nb-notifs" onclick="switchTab('notifs')" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span id="notif-dot2" style="display:none;position:absolute;top:6px;right:12px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid #fff;"></span>Alerts</button>
+  <button class="nb" id="nb-friends" onclick="switchTab('friends')" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span id="friend-req-dot" style="display:none;position:absolute;top:6px;right:10px;width:9px;height:9px;background:var(--red);border-radius:50%;border:2px solid #fff;"></span>Friends</button>
   <button class="nb" id="nb-profile" onclick="switchTab('profile')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
 </nav>
 
@@ -806,7 +843,7 @@ function switchTab(tab){
   history.pushState({page:prev},'');
   if(tab==='feed')loadFeed();if(tab==='map')initMap();
   if(tab==='ebooks')loadBooks();if(tab==='profile')loadProfile();
-  if(tab==='search')initSearch();if(tab==='notifs')loadNotifications();
+  if(tab==='search')initSearch();if(tab==='notifs')loadNotifications();if(tab==='friends')loadFriendsPage();
 }
 window.addEventListener('popstate',(e)=>{
   // Close lightbox first
@@ -853,11 +890,12 @@ function imgToBase64(file,maxW,quality){
 // Store post photo in Firestore images collection, return "fs:DOCID"
 async function uploadPostPhoto(file,progressCb){
   if(progressCb)progressCb(10);
-  // 1080px, quality 0.92 = Instagram-level. No external compression.
-  const b64=await imgToBase64(file,1080,0.92);
+  // Use original dimensions up to 2048px, quality 1.0 = no compression loss
+  const maxDim = Math.max(file.size > 3*1024*1024 ? 2048 : 4096, 2048);
+  const b64=await imgToBase64(file, maxDim, 1.0);
   if(progressCb)progressCb(55);
   const sizeKB=Math.round(b64.length*0.75/1024);
-  console.log('Photo:',sizeKB+'KB at 1080px q0.92');
+  console.log('Photo:',sizeKB+'KB original quality');
   const imgDoc=await fs.addDoc(fs.collection(db,'images'),{data:b64,uid:CU?.id||'',created_at:fs.serverTimestamp()});
   if(progressCb)progressCb(100);
   return'fs:'+imgDoc.id;
@@ -961,7 +999,7 @@ function launchApp(){
   history.replaceState({page:'pg-feed'},'');history.pushState({page:'pg-feed'},'');
   loadFeed();
   // Check for unread notifications after 2s (show red dot)
-  setTimeout(checkUnreadNotifs,2000);
+  setTimeout(checkUnreadNotifs,2000);setTimeout(checkFriendRequests,3000);
 }
 
 // ── LOCATION ──────────────────────────────────────────────
@@ -988,6 +1026,8 @@ function loadFeed(){
     feedUnsub=fs.onSnapshot(q,snap=>{
       let posts=snap.docs.map(d=>({id:d.id,...d.data()}));
       if(feedCat)posts=posts.filter(p=>p.category===feedCat);
+      // Filter out friends-only posts from non-friends
+      posts=posts.filter(p=>canSeePost(p));
       renderFeed(posts);
     },()=>{listEl.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Could not load posts.<br>Check your internet.</p></div>'});
   }catch(e){listEl.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Error loading feed.</p></div>'}
@@ -1012,7 +1052,7 @@ function renderFeed(posts){
         </div>
         <div style="flex:1;min-width:0;cursor:pointer;" onclick="viewUserProfile('${post.uid}')">
           <div class="post-user">${esc(post.full_name||'User')}${post.verification_level&&post.verification_level!=='none'?' <span style="color:var(--G)">✅</span>':''}${post.is_trusted_local?' <span style="color:var(--gold)">🏆</span>':''}</div>
-          <div class="post-loc">📍 ${esc(post.location_name||post.city||'Local')} · ${fmtTime(post.created_at||post.ts)}</div>
+          <div class="post-loc">📍 ${esc(post.location_name||post.city||'Local')} · ${fmtTime(post.created_at||post.ts)}${post.privacy==='friends'?' <span class="priv-badge friends">👥 Friends</span>':''}</div>
         </div>
         <button class="post-menu-btn" onclick="openPostMenu('${post.id}','${post.uid}')">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>
@@ -1020,7 +1060,7 @@ function renderFeed(posts){
       </div>
              <div style="flex:1;min-width:0;">
           <div class="post-user">${esc(post.full_name||'User')}${post.verification_level&&post.verification_level!=='none'?' <span style="color:var(--G)">✅</span>':''}${post.is_trusted_local?' <span style="color:var(--gold)">🏆</span>':''}</div>
-          <div class="post-loc">📍 ${esc(post.location_name||post.city||'Local')} · ${fmtTime(post.created_at||post.ts)}</div>
+          <div class="post-loc">📍 ${esc(post.location_name||post.city||'Local')} · ${fmtTime(post.created_at||post.ts)}${post.privacy==='friends'?' <span class="priv-badge friends">👥 Friends</span>':''}</div>
         </div>
       </div>
       ${post.ai_flag?'<div class="ai-warn">⚠️ AI-generated content detected — under review</div>':''}
@@ -1205,7 +1245,7 @@ async function submitPost(){
   const prog=$('prog'),fill=$('prog-f');prog.style.display='block';fill.style.width='10%';
   try{
     const mediaUrl=await uploadPostPhoto(chosenPostPhoto.file,pct=>{fill.style.width=pct+'%'});
-    const postData={uid:CU.id,full_name:CU.full_name,username:CU.username,avatar_url:CU.avatar_url||'',city:CU.city,location_name:userLoc?.name||CU.city||'Local',latitude:userLoc?.lat||null,longitude:userLoc?.lng||null,caption:cap,category:chosenCat||'other',media_url:mediaUrl,likes:[],comments_count:0,verification_level:CU.verification_level||'basic',is_trusted_local:CU.is_trusted_local||false,ai_flag:false,created_at:fs.serverTimestamp()};
+    const postData={uid:CU.id,full_name:CU.full_name,username:CU.username,avatar_url:CU.avatar_url||'',city:CU.city,location_name:userLoc?.name||CU.city||'Local',latitude:userLoc?.lat||null,longitude:userLoc?.lng||null,caption:cap,category:chosenCat||'other',privacy:_postPrivacy||'public',media_url:mediaUrl,likes:[],comments_count:0,verification_level:CU.verification_level||'basic',is_trusted_local:CU.is_trusted_local||false,ai_flag:false,created_at:fs.serverTimestamp()};
     await fs.addDoc(fs.collection(db,'posts'),postData);
     try{await fs.updateDoc(fs.doc(db,'users',CU.id),{posts_count:fs.increment(1)})}catch(e){}
     setTimeout(()=>{prog.style.display='none';fill.style.width='0%'},500);
@@ -1215,6 +1255,7 @@ async function submitPost(){
     $('c-cap').value='';$('pz').classList.remove('filled');$('pp').src='';
     document.querySelectorAll('#ctags .ctag').forEach(c=>c.classList.remove('on'));$('fi-post').value='';
     const ps=$('photo-suggestions');if(ps)ps.classList.remove('show');
+    _postPrivacy='public';setPrivacy('public');
     setTimeout(()=>switchTab('feed'),700);
   }catch(e){
     console.error('Post error:',e);toast('❌ '+e.message);
@@ -1494,6 +1535,303 @@ function openBookReader(book){
 }
 
 
+// ═══════════════════════════════════════════════════════
+//  PRIVACY SYSTEM
+// ═══════════════════════════════════════════════════════
+let _postPrivacy = 'public';
+
+function setPrivacy(val){
+  _postPrivacy = val;
+  var pb = document.getElementById('priv-public');
+  var fb = document.getElementById('priv-friends');
+  if(!pb||!fb) return;
+  if(val === 'public'){
+    pb.style.background='var(--G)'; pb.style.color='#fff';
+    fb.style.background='#fff'; fb.style.color='var(--muted)';
+  } else {
+    fb.style.background='var(--G)'; fb.style.color='#fff';
+    pb.style.background='#fff'; pb.style.color='var(--muted)';
+  }
+}
+
+// Get list of friend UIDs from localStorage
+function getFriendUIDs(){
+  try{ return JSON.parse(localStorage.getItem('ln_friends_'+CU.id)||'[]'); }
+  catch(e){ return []; }
+}
+
+function saveFriendUIDs(arr){
+  localStorage.setItem('ln_friends_'+CU.id, JSON.stringify(arr));
+}
+
+// Check if a post should be visible to current user
+function canSeePost(post){
+  if(!post.privacy || post.privacy === 'public') return true;
+  if(!CU) return false;
+  if(post.uid === CU.id) return true;
+  return getFriendUIDs().includes(post.uid);
+}
+
+// ═══════════════════════════════════════════════════════
+//  FRIEND REQUEST SYSTEM
+// ═══════════════════════════════════════════════════════
+function getFriendStatus(uid){
+  if(!CU) return 'none';
+  var friends = getFriendUIDs();
+  if(friends.includes(uid)) return 'friends';
+  try{
+    var sent = JSON.parse(localStorage.getItem('ln_sent_'+CU.id)||'[]');
+    if(sent.includes(uid)) return 'sent';
+    var recv = JSON.parse(localStorage.getItem('ln_recv_'+CU.id)||'[]');
+    if(recv.includes(uid)) return 'received';
+  }catch(e){}
+  return 'none';
+}
+
+async function sendFriendRequest(uid, name, avatar){
+  if(!CU){ toast('Sign in to add friends'); return; }
+  if(uid === CU.id){ toast('You cannot add yourself'); return; }
+  var status = getFriendStatus(uid);
+  if(status === 'friends'){ toast('Already friends!'); return; }
+  if(status === 'sent'){ toast('Request already sent'); return; }
+
+  // Save to localStorage
+  try{
+    var sent = JSON.parse(localStorage.getItem('ln_sent_'+CU.id)||'[]');
+    if(!sent.includes(uid)){ sent.push(uid); localStorage.setItem('ln_sent_'+CU.id, JSON.stringify(sent)); }
+  }catch(e){}
+
+  // Save request to Firestore
+  try{
+    await fs.addDoc(fs.collection(db,'friend_requests'),{
+      from_uid: CU.id, from_name: CU.full_name,
+      from_username: CU.username, from_avatar: CU.avatar_url||'',
+      to_uid: uid, status: 'pending',
+      created_at: fs.serverTimestamp()
+    });
+    // Notify the other person
+    await fs.addDoc(fs.collection(db,'notifications'),{
+      to_uid: uid, from_uid: CU.id,
+      from_name: CU.full_name, from_avatar: CU.avatar_url||'',
+      from_username: CU.username,
+      type: 'friend_request', read: false,
+      created_at: fs.serverTimestamp()
+    });
+  }catch(e){ console.error('sendFriendRequest:', e); }
+
+  toast('Friend request sent to '+name+'!');
+  updateAddFriendBtn(uid);
+}
+
+async function acceptFriendRequest(fromUid, reqDocId){
+  if(!CU) return;
+  try{
+    // Mark request accepted in Firestore
+    if(reqDocId) await fs.updateDoc(fs.doc(db,'friend_requests',reqDocId),{status:'accepted'});
+
+    // Add to both friends lists in localStorage
+    var myFriends = getFriendUIDs();
+    if(!myFriends.includes(fromUid)){ myFriends.push(fromUid); saveFriendUIDs(myFriends); }
+
+    // Remove from received list
+    var recv = JSON.parse(localStorage.getItem('ln_recv_'+CU.id)||'[]');
+    recv = recv.filter(function(id){ return id !== fromUid; });
+    localStorage.setItem('ln_recv_'+CU.id, JSON.stringify(recv));
+
+    // Add mutual friend in Firestore (store friendship document)
+    var cid = [CU.id, fromUid].sort().join('_');
+    await fs.setDoc(fs.doc(db,'friendships',cid),{
+      members: [CU.id, fromUid],
+      created_at: fs.serverTimestamp()
+    },{merge:true});
+
+    // Notify sender
+    await fs.addDoc(fs.collection(db,'notifications'),{
+      to_uid: fromUid, from_uid: CU.id,
+      from_name: CU.full_name, from_avatar: CU.avatar_url||'',
+      from_username: CU.username,
+      type: 'friend_accepted', read: false,
+      created_at: fs.serverTimestamp()
+    });
+    toast('You are now friends!');
+    loadFriendsPage();
+    checkFriendRequests();
+  }catch(e){ toast('Could not accept request. Try again.'); console.error(e); }
+}
+
+async function declineFriendRequest(fromUid, reqDocId){
+  if(!CU) return;
+  try{
+    if(reqDocId) await fs.updateDoc(fs.doc(db,'friend_requests',reqDocId),{status:'declined'});
+    var recv = JSON.parse(localStorage.getItem('ln_recv_'+CU.id)||'[]');
+    recv = recv.filter(function(id){ return id !== fromUid; });
+    localStorage.setItem('ln_recv_'+CU.id, JSON.stringify(recv));
+    toast('Request declined.');
+    loadFriendsPage();
+  }catch(e){ console.error(e); }
+}
+
+async function removeFriend(uid){
+  if(!CU || !confirm('Remove this friend?')) return;
+  var friends = getFriendUIDs();
+  friends = friends.filter(function(id){ return id !== uid; });
+  saveFriendUIDs(friends);
+  try{
+    var cid = [CU.id, uid].sort().join('_');
+    await fs.deleteDoc(fs.doc(db,'friendships',cid));
+  }catch(e){}
+  toast('Friend removed.');
+  loadFriendsPage();
+}
+
+// ── Friends page tabs ──────────────────────────────────
+var _friendsTab = 'friends';
+
+function setFriendsTab(el, tab){
+  document.querySelectorAll('#friends-tabs .chip').forEach(function(c){ c.classList.remove('on'); });
+  el.classList.add('on');
+  _friendsTab = tab;
+  loadFriendsPage();
+}
+
+async function loadFriendsPage(){
+  if(!CU){ return; }
+  var listEl = document.getElementById('friends-list');
+  listEl.innerHTML = '<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
+
+  if(_friendsTab === 'friends'){
+    // Show current friends
+    var friends = getFriendUIDs();
+    if(!friends.length){
+      listEl.innerHTML = '<div class="empty"><div class="ei">👥</div><p>No friends yet.<br>Search for people and send a friend request!</p></div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    // Load each friend's data
+    for(var i=0; i<Math.min(friends.length,30); i++){
+      try{
+        var snap = await fs.getDoc(fs.doc(db,'users',friends[i]));
+        if(snap.exists()){
+          var u = {id:snap.id,...snap.data()};
+          renderFriendItem(listEl, u, 'friend');
+        }
+      }catch(e){ console.warn('load friend:', e); }
+    }
+
+  } else if(_friendsTab === 'requests'){
+    // Show incoming friend requests from Firestore
+    try{
+      var q = fs.query(fs.collection(db,'friend_requests'),
+        fs.where('to_uid','==',CU.id),
+        fs.where('status','==','pending'),
+        fs.limit(30));
+      var snap2 = await fs.getDocs(q);
+      if(snap2.empty){
+        listEl.innerHTML = '<div class="empty"><div class="ei">📨</div><p>No pending friend requests.</p></div>';
+        return;
+      }
+      listEl.innerHTML = '';
+      snap2.docs.forEach(function(d){
+        var req = {reqId:d.id,...d.data()};
+        renderFriendItem(listEl, {
+          id:req.from_uid, full_name:req.from_name,
+          username:req.from_username, avatar_url:req.from_avatar
+        }, 'request', req.reqId);
+      });
+    }catch(e){
+      listEl.innerHTML = '<div class="empty"><div class="ei">📨</div><p>No pending requests.</p></div>';
+      console.warn('load requests:', e);
+    }
+
+  } else if(_friendsTab === 'sent'){
+    // Show sent requests
+    try{
+      var q3 = fs.query(fs.collection(db,'friend_requests'),
+        fs.where('from_uid','==',CU.id),
+        fs.where('status','==','pending'),
+        fs.limit(30));
+      var snap3 = await fs.getDocs(q3);
+      if(snap3.empty){
+        listEl.innerHTML = '<div class="empty"><div class="ei">📤</div><p>No pending sent requests.</p></div>';
+        return;
+      }
+      listEl.innerHTML = '';
+      snap3.docs.forEach(function(d){
+        var req = d.data();
+        var div = document.createElement('div'); div.className='friend-item';
+        var bgC = COLORS[strHash(req.to_uid||d.id)%COLORS.length];
+        div.innerHTML = '<div class="friend-avi" style="background:'+bgC+'22;">'+(req.to_avatar?'<img src="'+req.to_avatar+'" alt=""/>':initial(req.to_name||'?'))+'</div>'
+          +'<div style="flex:1;min-width:0;"><div class="friend-name">'+esc(req.to_name||req.to_uid||'User')+'</div><div class="friend-sub">@'+esc(req.to_username||'')+'</div></div>'
+          +'<div class="friend-actions"><button class="fa-btn pending">Pending</button></div>';
+        listEl.appendChild(div);
+      });
+    }catch(e){
+      listEl.innerHTML = '<div class="empty"><div class="ei">📤</div><p>No sent requests.</p></div>';
+    }
+  }
+}
+
+function renderFriendItem(listEl, u, type, reqId){
+  var div = document.createElement('div'); div.className='friend-item';
+  var bgC = COLORS[strHash(u.id||'')%COLORS.length];
+  var aviHtml = u.avatar_url
+    ? '<img src="'+u.avatar_url+'" onerror="this.style.display=\'none\'" alt=""/>'
+    : initial(u.full_name||'?');
+
+  var actionsHtml = '';
+  if(type === 'friend'){
+    actionsHtml = '<button class="fa-btn decline" onclick="removeFriend(\''+u.id+'\')">Remove</button>'
+      +'<button class="fa-btn accept" onclick="openChat(\''+u.id+'\',\''+esc(u.full_name||'User')+'\',\''+esc(u.avatar_url||'')+'\')">💬</button>';
+  } else if(type === 'request'){
+    actionsHtml = '<button class="fa-btn accept" onclick="acceptFriendRequest(\''+u.id+'\',\''+reqId+'\')">Accept</button>'
+      +'<button class="fa-btn decline" onclick="declineFriendRequest(\''+u.id+'\',\''+reqId+'\')">Decline</button>';
+  }
+
+  div.innerHTML = '<div class="friend-avi" style="background:'+bgC+'22;">'+aviHtml+'</div>'
+    +'<div style="flex:1;min-width:0;cursor:pointer;" onclick="viewUserProfile(\''+u.id+'\')">'
+    +'<div class="friend-name">'+esc(u.full_name||'User')+'</div>'
+    +'<div class="friend-sub">@'+esc(u.username||u.city||'')+'</div></div>'
+    +'<div class="friend-actions">'+actionsHtml+'</div>';
+  listEl.appendChild(div);
+}
+
+// Check for pending friend requests (show red dot)
+async function checkFriendRequests(){
+  if(!CU) return;
+  try{
+    var q = fs.query(fs.collection(db,'friend_requests'),
+      fs.where('to_uid','==',CU.id),
+      fs.where('status','==','pending'),
+      fs.limit(1));
+    var snap = await fs.getDocs(q);
+    var dot = document.getElementById('friend-req-dot');
+    var cnt = document.getElementById('req-count');
+    if(dot) dot.style.display = snap.empty ? 'none' : 'block';
+    if(cnt) cnt.textContent = snap.empty ? '' : ' 🔴';
+  }catch(e){ console.warn('checkFriendRequests:', e); }
+}
+
+// ── Update add friend button on user profile ───────────────────
+function updateAddFriendBtn(uid){
+  var btn = document.getElementById('add-friend-btn');
+  if(!btn) return;
+  var status = getFriendStatus(uid);
+  if(status === 'friends'){
+    btn.textContent = '✓ Friends'; btn.style.background='var(--bg)';
+    btn.style.color='var(--muted)'; btn.style.border='1.5px solid var(--border)';
+  } else if(status === 'sent'){
+    btn.textContent = 'Request Sent'; btn.style.background='var(--bg)';
+    btn.style.color='var(--muted)'; btn.style.border='1.5px solid var(--border)';
+  } else if(status === 'received'){
+    btn.textContent = 'Accept Request'; btn.style.background='var(--G)';
+    btn.style.color='#fff'; btn.style.border='none';
+  } else {
+    btn.textContent = '+ Add Friend'; btn.style.background='var(--G)';
+    btn.style.color='#fff'; btn.style.border='none';
+  }
+}
+
+
 function boot(){
   db=window._db;fs=window._fs;
   try{const sess=localStorage.getItem('ln_sess');if(sess){CU=JSON.parse(sess);if(CU)window._currentUID=CU.id}}catch(e){}
@@ -1640,9 +1978,40 @@ async function viewUserProfile(uid){
     if(u.about){ $('up-about-block').style.display='block'; $('up-about-text').textContent=u.about; }
     else $('up-about-block').style.display='none';
     // Check if already following
-    updateFollowBtn(uid);
     loadUserPosts(uid);
-    setTimeout(addMsgBtn,200);
+    setTimeout(function(){
+      // Remove old buttons
+      var old = document.getElementById('add-friend-btn');
+      if(old) old.remove();
+      var oldm = document.getElementById('msg-btn');
+      if(oldm) oldm.remove();
+      // Add Friend button
+      var fp = document.getElementById('follow-btn');
+      if(fp && fp.parentElement){
+        // Replace follow btn with Add Friend
+        fp.style.display='none';
+        var afb = document.createElement('button');
+        afb.id='add-friend-btn'; afb.className='btn';
+        afb.style.flex='1'; afb.style.padding='12px'; afb.style.fontSize='14px';
+        afb.onclick=function(){
+          var st=getFriendStatus(uid);
+          if(st==='received'){ 
+            // Find the request and accept it
+            fs.getDocs(fs.query(fs.collection(db,'friend_requests'),
+              fs.where('from_uid','==',uid),fs.where('to_uid','==',CU.id),
+              fs.where('status','==','pending'),fs.limit(1)
+            )).then(function(s){ acceptFriendRequest(uid, s.docs[0]?s.docs[0].id:''); });
+          } else { sendFriendRequest(uid,_viewingUserName,_viewingUserAvatar); }
+        };
+        fp.parentElement.insertBefore(afb, fp);
+        updateAddFriendBtn(uid);
+        // Message button
+        var mb = document.createElement('button');
+        mb.id='msg-btn'; mb.className='btn-outline'; mb.style.marginTop='8px'; mb.textContent='💬 Message';
+        mb.onclick=function(){ openChat(uid,_viewingUserName||'User',_viewingUserAvatar||''); };
+        fp.parentElement.appendChild(mb);
+      }
+    },150);
   }catch(e){ toast('Could not load profile.'); }
 }
 
@@ -1852,17 +2221,24 @@ async function loadNotifications(){
   const listEl=$('notif-list');
   listEl.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
   try{
+    // Query without orderBy to avoid needing a Firestore composite index
     const q=fs.query(
       fs.collection(db,'notifications'),
       fs.where('to_uid','==',CU.id),
-      fs.orderBy('created_at','desc'),
-      fs.limit(30)
+      fs.limit(50)
     );
     const snap=await fs.getDocs(q);
-    if(snap.empty){ listEl.innerHTML='<div class="empty"><div class="ei">🔔</div><p>No notifications yet.<br>When someone likes or follows you,<br>it shows here!</p></div>'; return; }
+    if(snap.empty){ listEl.innerHTML='<div class="empty"><div class="ei">🔔</div><p>No notifications yet.<br>When someone likes, comments, or follows you, it shows here!</p></div>'; return; }
+    // Sort newest first in JS (avoids composite index requirement)
+    const notifs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    notifs.sort((a,b)=>{
+      const ta=a.created_at?.toMillis?a.created_at.toMillis():(a.created_at||0);
+      const tb=b.created_at?.toMillis?b.created_at.toMillis():(b.created_at||0);
+      return tb-ta;
+    });
     listEl.innerHTML='';
-    snap.docs.forEach(d=>{
-      const n={id:d.id,...d.data()};
+    notifs.forEach(d=>{
+      const n=d.id?{id:d.id,...d.data()}:d;
       const div=document.createElement('div');
       div.className='notif-item'+(n.read?'':' unread');
       const bgC=COLORS[strHash(n.from_uid||n.id)%COLORS.length];
@@ -1890,7 +2266,6 @@ async function loadNotifications(){
     console.error('Notifications error:',e);
   }
 }
-
 async function markNotifRead(notifId){
   try{ await fs.updateDoc(fs.doc(db,'notifications',notifId),{read:true}); }catch(e){}
 }
@@ -1911,7 +2286,7 @@ async function markAllRead(){
 async function checkUnreadNotifs(){
   if(!CU) return;
   try{
-    const q=fs.query(fs.collection(db,'notifications'),fs.where('to_uid','==',CU.id),fs.where('read','==',false),fs.limit(1));
+    const q=fs.query(fs.collection(db,'notifications'),fs.where('to_uid','==',CU.id),fs.limit(20));
     const snap=await fs.getDocs(q);
     const has=!snap.empty;
     [$('notif-dot'),$('notif-dot2')].forEach(el=>{if(el) el.style.display=has?'block':'none';});
