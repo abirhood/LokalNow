@@ -14,7 +14,7 @@
 <script type="module">
 import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, getDoc,
-         doc, updateDoc, deleteDoc, query, orderBy, limit,
+         doc, updateDoc, deleteDoc, setDoc, query, orderBy, limit,
          onSnapshot, arrayUnion, arrayRemove,
          serverTimestamp, where, increment }
                              from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -29,7 +29,7 @@ const app = initializeApp({
 const db = getFirestore(app);
 window._db = db;
 window._fs = { collection, addDoc, getDocs, getDoc, doc, updateDoc,
-               deleteDoc, query, orderBy, limit, onSnapshot,
+               deleteDoc, setDoc, query, orderBy, limit, onSnapshot,
                arrayUnion, arrayRemove, serverTimestamp, where, increment };
 window._fbReady = true;
 </script>
@@ -1108,12 +1108,15 @@ async function toggleLike(postId,wasLiked){
   lc.textContent=fmtN((parseInt(lc.textContent)||0)+(now?1:-1));
   try{
     await fs.updateDoc(fs.doc(db,'posts',postId),{likes:now?fs.arrayUnion(CU.id):fs.arrayRemove(CU.id)});
-    // Send notification to post owner
-    if(now){
-      const ps=await fs.getDoc(fs.doc(db,'posts',postId));
-      if(ps.exists()&&ps.data().uid&&ps.data().uid!==CU.id){
+    // Update likes_received count on the post owner's profile
+    const ps=await fs.getDoc(fs.doc(db,'posts',postId));
+    if(ps.exists()&&ps.data().uid){
+      const ownerUid=ps.data().uid;
+      try{ await fs.updateDoc(fs.doc(db,'users',ownerUid),{likes_received:fs.increment(now?1:-1)}); }catch(e){}
+      // Send notification to post owner
+      if(now&&ownerUid!==CU.id){
         await fs.addDoc(fs.collection(db,'notifications'),{
-          to_uid:ps.data().uid,from_uid:CU.id,from_name:CU.full_name,
+          to_uid:ownerUid,from_uid:CU.id,from_name:CU.full_name,
           from_avatar:CU.avatar_url||'',from_username:CU.username,
           type:'like',post_id:postId,read:false,created_at:fs.serverTimestamp()
         });
@@ -1179,7 +1182,12 @@ async function deleteCmt(postId,cmtId){
   }catch(e){toast('Could not delete comment.')}
 }
 
-function sharePost(id){if(navigator.share)navigator.share({title:'LokalNow',url:location.href});else{navigator.clipboard?.writeText(location.href);toast('📋 Link copied!')}}
+function sharePost(id){
+  const base=location.href.split('?')[0];
+  const url=base+'?post='+id;
+  if(navigator.share)navigator.share({title:'LokalNow Post',url});
+  else{navigator.clipboard?.writeText(url);toast('📋 Post link copied!')}
+}
 function openMaps(lat,lng){window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank')}
 
 // ── MAP ───────────────────────────────────────────────────
@@ -1998,9 +2006,10 @@ async function confirmDeletePost(){
 
 function shareActivePost(){
   closeModal('post-action-modal');
-  const url = location.href;
+  const base = location.href.split('?')[0];
+  const url = _activePostId ? base+'?post='+_activePostId : base;
   if(navigator.share) navigator.share({title:'LokalNow post',url});
-  else{ navigator.clipboard?.writeText(url); toast('📋 Link copied!'); }
+  else{ navigator.clipboard?.writeText(url); toast('📋 Post link copied!'); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2188,7 +2197,7 @@ async function doSearch(q){
             <div class="uc-name">${esc(u.full_name||'—')}</div>
             <div class="uc-sub">@${esc(u.username||'')} · ${esc(u.city||'')}</div>
           </div>
-          ${!isMe?`<button class="uc-follow ${isFol?'following':''}" onclick="event.stopPropagation();quickFollow('${u.id}',this)">${isFol?'Following':'Follow'}</button>`:''}`;
+          ${!isMe?`<button class="uc-follow ${getFriendStatus(u.id)==='friends'?'following':''}" onclick="event.stopPropagation();quickAddFriend('${u.id}','${esc(u.full_name||'User')}','${esc(u.avatar_url||'')}',this)">${getFriendStatus(u.id)==='friends'?'✓ Friends':getFriendStatus(u.id)==='sent'?'Pending':'+ Friend'}</button>`:''}`;
         resultsEl.appendChild(div);
       });
     } else {
@@ -2222,6 +2231,16 @@ async function doSearch(q){
   }catch(e){
     resultsEl.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Search failed. Try again.</p></div>';
   }
+}
+
+async function quickAddFriend(uid, name, avatar, btn){
+  if(!CU){ toast('Sign in to add friends'); return; }
+  if(uid === CU.id){ toast('You cannot add yourself'); return; }
+  var status = getFriendStatus(uid);
+  if(status === 'friends'){ toast('Already friends!'); return; }
+  if(status === 'sent'){ toast('Request already sent.'); return; }
+  await sendFriendRequest(uid, name, avatar);
+  if(btn){ btn.textContent='Pending'; btn.classList.add('following'); }
 }
 
 async function quickFollow(uid, btn){
