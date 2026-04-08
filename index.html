@@ -1386,22 +1386,37 @@ async function loadProfile(){
       const liked=Array.isArray(p.likes)&&CU&&p.likes.includes(CU.id);
       const card=document.createElement('div');
       card.className='post';card.style.margin='0 0 2px';card.style.borderRadius='0';
-      card.innerHTML=\`<div class="pa" style="padding:10px 13px 6px;">
-        <div style="flex:1;"><div style="font-weight:700;font-size:13px;">\${esc(p.location_name||p.city||'Local')}</div><div style="font-size:11px;color:var(--muted);">\${fmtTime(p.created_at||p.ts)}</div></div>
-        <button class="post-menu-btn" onclick="openPostMenu('\${p.id}','\${p.uid}')"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg></button>
-      </div>
-      \${p.caption?\`<div class="cap" style="padding:2px 13px 8px;">\${esc(p.caption)}</div>\`:''}
-      <div class="pi-wrap">
-        <div class="pi-ph" id="ph-pr-\${p.id}">\${EMOJI[p.category]||'📸'}</div>
-        <img class="pi" id="pi-pr-\${p.id}" alt="" style="display:none;"/>
-      </div>
-      <div class="pa">
-        <button class="ab\${liked?' liked':''}" id="lb-pr-\${p.id}" onclick="toggleLike('\${p.id}',\${liked})">
-          <svg viewBox="0 0 24 24" stroke-width="2"\${liked?' fill="var(--red)"':''}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <span>\${fmtN(lc)}</span>
-        </button>
-        <button class="ab" onclick="sharePost('\${p.id}')"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
-      </div>\`;
+      card.dataset.pid=p.id;
+      var lh='';
+      if(p.caption) lh='<div class="cap" style="padding:2px 13px 8px;"><b>'+esc(p.username||'user')+'</b> '+esc(p.caption)+'</div>';
+      var lk=liked?' liked':'';
+      var lf=liked?' fill="var(--red)"':'';
+      card.innerHTML='<div class="pa" style="padding:10px 13px 6px;">'
+        +'<div style="flex:1;">'
+        +'<div style="font-weight:700;font-size:13px;">'+esc(p.location_name||p.city||'Local')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);">'+fmtTime(p.created_at||p.ts)+'</div>'
+        +'</div>'
+        +'<button class="post-menu-btn" data-pid="'+p.id+'" data-puid="'+p.uid+'" onclick="openPostMenu(this.dataset.pid,this.dataset.puid)">'
+        +'<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/>'
+        +'<circle cx="12" cy="12" r="1.5" fill="currentColor"/>'
+        +'<circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>'
+        +'</button></div>'
+        +lh
+        +'<div class="pi-wrap">'
+        +'<div class="pi-ph" id="ph-pr-'+p.id+'">'+( EMOJI[p.category]||'📸')+'</div>'
+        +'<img class="pi" id="pi-pr-'+p.id+'" alt="" style="display:none;"/>'
+        +'</div>'
+        +'<div class="pa">'
+        +'<button class="ab'+lk+'" id="lb-pr-'+p.id+'" data-pid="'+p.id+'" data-lk="'+liked+'" onclick="profileToggleLike(this)">'
+        +'<svg viewBox="0 0 24 24" stroke-width="2"'+lf+'>'
+        +'<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'
+        +'</svg><span>'+fmtN(lc)+'</span></button>'
+        +'<button class="ab" data-pid="'+p.id+'" onclick="sharePost(this.dataset.pid)">'
+        +'<svg viewBox="0 0 24 24" stroke-width="2">'
+        +'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>'
+        +'<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>'
+        +'<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>'
+        +'</div>';
       grid.appendChild(card);
       if(p.media_url) loadPostImage('pr-'+p.id, p.media_url);
     });
@@ -2648,7 +2663,7 @@ async function loadLibrary(){
       const card=document.createElement('div');
       card.className='bc';
       card.onclick=()=>openPDFReader(b);
-      card.innerHTML=\`<div class="bcv" style="background:\${col||'#e8f5ee'};flex-direction:column;gap:4px;">
+      card.innerHTML=`<div class="bcv" style="background:\${col||'#e8f5ee'};flex-direction:column;gap:4px;">
         <div style="font-size:32px;">\${LIB_EMOJI[b.category]||'📖'}</div>
         <div style="font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,.3);padding:2px 7px;border-radius:4px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${esc(b.category||'book').toUpperCase()}</div>
       </div>
@@ -2658,7 +2673,7 @@ async function loadLibrary(){
         \${b.publisher?'<div class="ba">🏢 '+esc(b.publisher)+'</div>':''}
         \${b.year?'<div class="ba">📅 '+esc(b.year)+'</div>':''}
         <div style="margin-top:5px;font-size:11px;color:var(--G);font-weight:700;">📄 PDF · Free</div>
-      </div>\`;
+      </div>`;
       wrapper.appendChild(card);
     });
     grid.appendChild(wrapper);
@@ -2691,6 +2706,12 @@ function openPDFReader(book){
   } else {
     body.innerHTML='<div style="padding:20px;color:#fff;"><h2 style="margin-bottom:10px;">'+esc(book.title)+'</h2><p>'+esc(book.description||'No content.')+'</p></div>';
   }
+}
+
+function profileToggleLike(btn){
+  var pid=btn.dataset.pid;
+  var wasLiked=(btn.dataset.lk==='true');
+  toggleLike(pid,wasLiked);
 }
 
 waitForFirebase();
