@@ -118,9 +118,9 @@ textarea.inp{resize:none}
 .avi img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
 .post-user{font-weight:700;font-size:14px;line-height:1.2}
 .post-loc{font-size:11px;color:var(--muted);margin-top:2px}
-.pi-wrap{position:relative;background:#e8f5ee}
-.pi{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#e8f5ee}
-.pi-ph{width:100%;aspect-ratio:4/3;background:linear-gradient(135deg,#e8f5ee,#d0e8da);display:flex;align-items:center;justify-content:center;font-size:56px}
+.pi-wrap{position:relative;background:#e8f5ee;overflow:hidden;width:100%;aspect-ratio:4/3}
+.pi{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#e8f5ee}
+.pi-ph{position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,#e8f5ee,#d0e8da);display:flex;align-items:center;justify-content:center;font-size:56px}
 .ob{position:absolute;bottom:9px;left:9px;background:rgba(26,138,74,.88);padding:3px 8px;border-radius:6px;font-size:9px;color:#fff;font-weight:700}
 .ai-warn{background:#fff0f0;padding:8px 13px;font-size:12px;color:#c0392b;font-weight:600}
 .pa{display:flex;align-items:center;padding:6px 10px;gap:2px}
@@ -244,6 +244,10 @@ textarea.inp{resize:none}
 .mrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .mt{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--G2)}
 
+
+/* ── BADGE COUNTS on topbar icon buttons ─────────────────── */
+.icon-badge{display:none;position:absolute;top:4px;right:4px;min-width:17px;height:17px;background:var(--red);border-radius:9px;border:2px solid #fff;font-size:9px;font-weight:800;color:#fff;align-items:center;justify-content:center;padding:0 3px;font-family:'DM Sans',sans-serif;}
+.icon-badge.on{display:flex;}
 /* TOAST */
 #toast{position:fixed;bottom:calc(var(--sab) + 76px);left:50%;transform:translateX(-50%) translateY(8px);background:var(--G2);color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;font-weight:600;opacity:0;transition:all .26s;pointer-events:none;z-index:400;max-width:88%;text-align:center;line-height:1.4}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -465,10 +469,11 @@ textarea.inp{resize:none}
     <div style="display:flex;align-items:center;">
       <button class="ib" onclick="switchTab('notifs')" style="position:relative;">
         <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span id="notif-dot" style="display:none;position:absolute;top:8px;right:8px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid #fff;"></span>
+        <span class="icon-badge" id="notif-count-badge"></span>
       </button>
-      <button class="ib" onclick="openDMInbox()">
+      <button class="ib" onclick="openDMInbox()" style="position:relative;">
         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="icon-badge" id="dm-count-badge"></span>
       </button>
     </div>
   </div>
@@ -574,9 +579,14 @@ textarea.inp{resize:none}
       <button class="btn" style="flex:1;padding:12px;font-size:14px;" onclick="openEditModal()">✏️ Edit Profile</button>
       <button class="btn btn-red" style="flex:1;padding:12px;font-size:14px;" onclick="doLogout()">Sign Out</button>
     </div>
-    <div class="about-block" id="about-block" style="display:none;"><h4>About Me</h4><p id="about-text"></p></div>
+    <div class="about-block" id="about-block" style="display:block;cursor:pointer;" onclick="openEditModal()">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <h4>About Me</h4><span style="font-size:11px;color:var(--G);font-weight:600;">✏️ Edit</span>
+      </div>
+      <p id="about-text" style="color:var(--muted);font-style:italic;">Tap to add a bio...</p>
+    </div>
     <div class="sec-title">My Posts</div>
-    <div class="pgrid" id="pgrid"></div>
+    <div id="pgrid" style="display:flex;flex-direction:column;gap:0;padding-bottom:20px;"></div>
   </div>
 </div>
 
@@ -724,11 +734,47 @@ textarea.inp{resize:none}
   </div>
 </div>
 
+<!-- ══ LIBRARY (PDF Books) ══ -->
+<div class="page" id="pg-library" style="flex-direction:column;">
+  <div class="topbar">
+    <div class="logo" style="font-size:18px;">📚 Library</div>
+    <button class="ib" onclick="openLibModal()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+  <div class="chips" id="lib-chips" style="flex-shrink:0;">
+    <div class="chip on" onclick="setLibFilter(this,'all')">📚 All</div>
+    <div class="chip" onclick="setLibFilter(this,'fiction')">📖 Fiction</div>
+    <div class="chip" onclick="setLibFilter(this,'history')">🏛 History</div>
+    <div class="chip" onclick="setLibFilter(this,'tech')">💻 Tech</div>
+    <div class="chip" onclick="setLibFilter(this,'art')">🎨 Art</div>
+    <div class="chip" onclick="setLibFilter(this,'local')">📍 Local</div>
+    <div class="chip" onclick="setLibFilter(this,'science')">🔬 Science</div>
+    <div class="chip" onclick="setLibFilter(this,'religion')">🕌 Religion</div>
+  </div>
+  <div class="scroll" id="lib-grid">
+    <div class="empty"><div class="ei">⏳</div><p>Loading library...</p></div>
+  </div>
+</div>
+
+<!-- ══ PDF READER PAGE ══ -->
+<div class="page" id="pg-pdfreader" style="flex-direction:column;">
+  <div class="reader-head">
+    <button class="ib" onclick="history.back()" style="color:#fff;padding:6px;"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
+    <h3 id="pdf-reader-title">Book</h3>
+    <a id="pdf-download-link" href="#" download style="color:#fff;font-size:12px;font-weight:700;text-decoration:none;padding:6px 10px;background:rgba(255,255,255,.15);border-radius:8px;flex-shrink:0;">⬇ PDF</a>
+  </div>
+  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+    <div id="pdf-reader-body" style="flex:1;overflow-y:auto;padding:0;background:#555;-webkit-overflow-scrolling:touch;">
+      <p style="color:#fff;text-align:center;padding-top:40px;">Loading PDF...</p>
+    </div>
+  </div>
+</div>
+
 <!-- BOTTOM NAV -->
 <nav class="nav" id="nav">
   <button class="nb on" id="nb-feed" onclick="switchTab('feed')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Feed</button>
   <button class="nb" id="nb-search" onclick="switchTab('search')"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Search</button>
   <button class="nb" id="nb-create" onclick="switchTab('create')"><div class="nb-circle"><svg viewBox="0 0 24 24" stroke-width="2.5" style="width:22px;height:22px;"><path d="M12 5v14M5 12h14"/></svg></div>Post</button>
+  <button class="nb" id="nb-library" onclick="switchTab('library')"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Library</button>
   <button class="nb" id="nb-friends" onclick="switchTab('friends')" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span id="friend-req-dot" style="display:none;position:absolute;top:6px;right:10px;width:9px;height:9px;background:var(--red);border-radius:50%;border:2px solid #fff;"></span>Friends</button>
   <button class="nb" id="nb-profile" onclick="switchTab('profile')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
 </nav>
@@ -797,6 +843,34 @@ textarea.inp{resize:none}
     </div>
   </div>
 </div>
+<!-- Library Upload Modal -->
+<div class="mbg" id="lib-modal" onclick="if(event.target===this)closeModal('lib-modal')">
+  <div class="modal">
+    <div class="mrow"><div class="mt">📚 Add Book to Library</div><button class="ib" onclick="closeModal('lib-modal')"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="fl">BOOK TITLE *</div><input class="inp" id="lib-title" placeholder="Enter book title"/>
+    <div class="fl">AUTHOR / WRITER *</div><input class="inp" id="lib-author" placeholder="Author name"/>
+    <div class="fl">PUBLICATION / PUBLISHER</div><input class="inp" id="lib-pub" placeholder="Publisher name"/>
+    <div class="fl">YEAR</div><input class="inp" id="lib-year" placeholder="e.g. 2024" type="number"/>
+    <div class="fl">SHORT DESCRIPTION</div><input class="inp" id="lib-desc" placeholder="What is this book about?"/>
+    <div class="fl">CATEGORY</div>
+    <div class="ctags" id="lib-cats" style="margin-bottom:12px;">
+      <div class="ctag" onclick="pickLibCat(this,'fiction')">📖 Fiction</div>
+      <div class="ctag" onclick="pickLibCat(this,'history')">🏛 History</div>
+      <div class="ctag" onclick="pickLibCat(this,'tech')">💻 Tech</div>
+      <div class="ctag" onclick="pickLibCat(this,'art')">🎨 Art</div>
+      <div class="ctag" onclick="pickLibCat(this,'local')">📍 Local</div>
+      <div class="ctag" onclick="pickLibCat(this,'science')">🔬 Science</div>
+      <div class="ctag" onclick="pickLibCat(this,'religion')">🕌 Religion</div>
+    </div>
+    <div class="bk-zone" id="lib-zone" onclick="document.getElementById('fi-lib-pdf').click()">
+      <div style="font-size:28px;margin-bottom:6px;">📄</div>
+      <div style="font-size:13px;color:var(--muted);" id="lib-zone-text">Tap to upload PDF file</div>
+    </div>
+    <input type="file" id="fi-lib-pdf" accept="application/pdf,.pdf" style="display:none" onchange="onLibPdfFile(event)"/>
+    <div class="prog" id="lib-prog" style="margin:0 0 8px;"><div class="prog-f" id="lib-prog-f"></div></div>
+    <button class="btn" id="lib-submit-btn" onclick="submitLibBook()">Add to Library →</button>
+  </div>
+</div>
 <div id="toast"></div>
 <input type="file" id="fi-post"   accept="image/*" style="display:none" onchange="onPostPhoto(event)"/>
 <input type="file" id="fi-avatar" accept="image/*" style="display:none" onchange="onAvatarPhoto(event)"/>
@@ -847,6 +921,7 @@ function switchTab(tab){
   if(tab==='feed')loadFeed();if(tab==='map')initMap();
   if(tab==='ebooks')loadBooks();if(tab==='profile')loadProfile();
   if(tab==='search')initSearch();if(tab==='notifs')loadNotifications();if(tab==='friends')loadFriendsPage();
+  if(tab==='library')loadLibrary();
 }
 window.addEventListener('popstate',(e)=>{
   // Close lightbox first
@@ -1005,7 +1080,7 @@ function launchApp(){
   history.replaceState({page:'pg-feed'},'');history.pushState({page:'pg-feed'},'');
   loadFeed();
   // Check for unread notifications after 2s (show red dot)
-  setTimeout(checkUnreadNotifs,2000);setTimeout(checkFriendRequests,3000);
+  setTimeout(checkUnreadNotifs,2000);setTimeout(checkFriendRequests,3000);setTimeout(checkUnreadDMs,2500);
 }
 
 // ── LOCATION ──────────────────────────────────────────────
@@ -1297,29 +1372,40 @@ async function loadProfile(){
   // Friends count = number of friends in local list
   const spf=document.getElementById('sp-friends');
   if(spf) spf.textContent=fmtN(getFriendUIDs().length);$('sp-likes').textContent=fmtN(CU.likes_received||0);
-  const ab=$('about-block');if(CU.about){ab.style.display='block';$('about-text').textContent=CU.about}else{ab.style.display='none'}
-  const grid=$('pgrid');grid.innerHTML='<div style="grid-column:span 3;text-align:center;padding:24px;color:var(--muted);">Loading...</div>';
+  const ab=$('about-block');ab.style.display='block';$('about-text').textContent=CU.about||'';if(!CU.about){$('about-text').textContent='Tap to add a bio...';$('about-text').style.color='var(--muted)';$('about-text').style.fontStyle='italic';}else{$('about-text').style.color='#2a3c2e';$('about-text').style.fontStyle='normal';}
+  const grid=$('pgrid');grid.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);">Loading...</div>';
   try{
-    // Query by uid only — no orderBy needed, sort in JS (avoids composite index requirement)
     const q=fs.query(fs.collection(db,'posts'),fs.where('uid','==',CU.id),fs.limit(30));
     const snap=await fs.getDocs(q);
     const docs=snap.docs.map(d=>({id:d.id,...d.data()}));
     docs.sort((a,b)=>{const ta=a.created_at?.toMillis?a.created_at.toMillis():(a.ts||0),tb=b.created_at?.toMillis?b.created_at.toMillis():(b.ts||0);return tb-ta});
     grid.innerHTML='';
-    if(!docs.length){grid.innerHTML='<div style="grid-column:span 3;text-align:center;padding:32px;color:var(--muted);font-size:13px;">No posts yet.<br>Share your first one! 📸</div>';return}
-    docs.slice(0,12).forEach(p=>{
-      const item=document.createElement('div');item.className='pgi';
-      item.onclick=()=>{if(p.media_url)openLightbox(p.media_url,p.caption);};
-      if(p.media_url){
-        const img=document.createElement('img');img.alt='';img.loading='lazy';
-        img.onerror=()=>{try{item.removeChild(img)}catch(e){} item.textContent=EMOJI[p.category]||'📸'};
-        item.appendChild(img);
-        resolveMedia(p.media_url).then(src=>{if(src)img.src=src}).catch(()=>{});
-      }else{item.textContent=EMOJI[p.category]||'📸'}
-      const ov=document.createElement('div');ov.className='pgo';ov.innerHTML='❤️ '+(Array.isArray(p.likes)?p.likes.length:0);
-      item.appendChild(ov);grid.appendChild(item);
+    if(!docs.length){grid.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;">No posts yet.<br>Share your first one! 📸</div>';return}
+    docs.forEach(p=>{
+      const lc=Array.isArray(p.likes)?p.likes.length:0;
+      const liked=Array.isArray(p.likes)&&CU&&p.likes.includes(CU.id);
+      const card=document.createElement('div');
+      card.className='post';card.style.margin='0 0 2px';card.style.borderRadius='0';
+      card.innerHTML=\`<div class="pa" style="padding:10px 13px 6px;">
+        <div style="flex:1;"><div style="font-weight:700;font-size:13px;">\${esc(p.location_name||p.city||'Local')}</div><div style="font-size:11px;color:var(--muted);">\${fmtTime(p.created_at||p.ts)}</div></div>
+        <button class="post-menu-btn" onclick="openPostMenu('\${p.id}','\${p.uid}')"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg></button>
+      </div>
+      \${p.caption?\`<div class="cap" style="padding:2px 13px 8px;">\${esc(p.caption)}</div>\`:''}
+      <div class="pi-wrap">
+        <div class="pi-ph" id="ph-pr-\${p.id}">\${EMOJI[p.category]||'📸'}</div>
+        <img class="pi" id="pi-pr-\${p.id}" alt="" style="display:none;"/>
+      </div>
+      <div class="pa">
+        <button class="ab\${liked?' liked':''}" id="lb-pr-\${p.id}" onclick="toggleLike('\${p.id}',\${liked})">
+          <svg viewBox="0 0 24 24" stroke-width="2"\${liked?' fill="var(--red)"':''}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span>\${fmtN(lc)}</span>
+        </button>
+        <button class="ab" onclick="sharePost('\${p.id}')"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
+      </div>\`;
+      grid.appendChild(card);
+      if(p.media_url) loadPostImage('pr-'+p.id, p.media_url);
     });
-  }catch(e){grid.innerHTML='<div style="grid-column:span 3;text-align:center;padding:24px;color:var(--muted);">Could not load posts.</div>'}
+  }catch(e){grid.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);">Could not load posts.</div>'}
 }
 
 function openEditModal(){$('e-name').value=CU?.full_name||'';$('e-city').value=CU?.city||'';$('e-about').value=CU?.about||'';countWords($('e-about'),'e-ac',200);openModal('edit-modal')}
@@ -1411,6 +1497,8 @@ function convId(a,b){return [a,b].sort().join('_');}
 
 async function openDMInbox(){
   if(!CU){toast('Sign in to use messages');return;}
+  // Clear DM badge when opening inbox
+  const badge=$('dm-count-badge');if(badge){badge.textContent='';badge.classList.remove('on');}
   navTo('pg-dms');
   const el=$('dm-list');
   el.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
@@ -2360,6 +2448,7 @@ async function quickFollow(uid, btn){
 // ═══════════════════════════════════════════════════════════════════
 async function loadNotifications(){
   if(!CU) return;
+  const badge=$('notif-count-badge');if(badge){badge.textContent='';badge.classList.remove('on');}
   const listEl=$('notif-list');
   listEl.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
   try{
@@ -2434,14 +2523,175 @@ async function markAllRead(){
 async function checkUnreadNotifs(){
   if(!CU) return;
   try{
-    const q=fs.query(fs.collection(db,'notifications'),fs.where('to_uid','==',CU.id),fs.limit(20));
+    const q=fs.query(fs.collection(db,'notifications'),fs.where('to_uid','==',CU.id),fs.where('read','==',false),fs.limit(99));
     const snap=await fs.getDocs(q);
-    const has=!snap.empty;
-    [$('notif-dot'),$('notif-dot2')].forEach(el=>{if(el) el.style.display=has?'block':'none';});
+    const cnt=snap.size;
+    const badge=$('notif-count-badge');
+    if(badge){badge.textContent=cnt>9?'9+':cnt>0?cnt:'';badge.classList.toggle('on',cnt>0);}
+  }catch(e){}
+}
+async function checkUnreadDMs(){
+  if(!CU) return;
+  try{
+    const q=fs.query(fs.collection(db,'convs'),fs.where('members','array-contains',CU.id),fs.limit(50));
+    const snap=await fs.getDocs(q);
+    let cnt=0;
+    snap.docs.forEach(d=>{const c=d.data();if(c.last_uid&&c.last_uid!==CU.id&&!c.read_by?.includes(CU.id))cnt++;});
+    const badge=$('dm-count-badge');
+    if(badge){badge.textContent=cnt>9?'9+':cnt>0?cnt:'';badge.classList.toggle('on',cnt>0);}
   }catch(e){}
 }
 
 // Also send notification on like
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  LIBRARY (PDF Books)
+// ═══════════════════════════════════════════════════════════════════
+let _libFilter = 'all';
+let _libPdfData = null;
+let _libChosenCat = null;
+
+function setLibFilter(el, f){
+  document.querySelectorAll('#lib-chips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); _libFilter=f; loadLibrary();
+}
+
+function pickLibCat(el, cat){
+  document.querySelectorAll('#lib-cats .ctag').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); _libChosenCat=cat;
+}
+
+function openLibModal(){
+  if(!CU){ toast('Sign in to add books'); return; }
+  $('lib-title').value='';$('lib-author').value='';$('lib-pub').value='';$('lib-year').value='';$('lib-desc').value='';
+  $('lib-zone-text').textContent='Tap to upload PDF file';
+  $('lib-zone').classList.remove('has-file');
+  _libPdfData=null; _libChosenCat=null;
+  document.querySelectorAll('#lib-cats .ctag').forEach(c=>c.classList.remove('on'));
+  $('lib-prog').style.display='none';
+  openModal('lib-modal');
+}
+
+function onLibPdfFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  const maxMB=5;
+  if(file.size > maxMB*1024*1024){ toast('PDF too large. Max 5MB.'); return; }
+  const r=new FileReader();
+  r.onload=ev=>{
+    _libPdfData={base64:ev.target.result, name:file.name, size:file.size};
+    $('lib-zone').classList.add('has-file');
+    $('lib-zone-text').textContent='✅ '+file.name+' ('+Math.round(file.size/1024)+'KB)';
+  };
+  r.readAsDataURL(file);
+}
+
+async function submitLibBook(){
+  const title=$('lib-title').value.trim(), author=$('lib-author').value.trim();
+  const pub=$('lib-pub').value.trim(), year=$('lib-year').value.trim();
+  const desc=$('lib-desc').value.trim();
+  if(!title||!author){ toast('Title and author are required'); return; }
+  if(!_libPdfData){ toast('Please upload a PDF file'); return; }
+  const btn=$('lib-submit-btn');
+  btn.innerHTML='<span class="spin"></span> Uploading...'; btn.disabled=true;
+  const prog=$('lib-prog'), fill=$('lib-prog-f');
+  prog.style.display='block'; fill.style.width='20%';
+  try{
+    // Store PDF base64 in Firestore (split if needed)
+    fill.style.width='50%';
+    const docRef=await fs.addDoc(fs.collection(db,'library'),{
+      title, author_name:author, publisher:pub||'', year:year||'',
+      description:desc, category:_libChosenCat||'fiction',
+      pdf_data:_libPdfData.base64, pdf_name:_libPdfData.name,
+      pdf_size:_libPdfData.size, uid:CU.id,
+      uploader_name:CU.full_name, uploader_username:CU.username,
+      created_at:fs.serverTimestamp()
+    });
+    fill.style.width='100%';
+    setTimeout(()=>{ prog.style.display='none'; fill.style.width='0%'; },500);
+    btn.textContent='Add to Library →'; btn.disabled=false;
+    closeModal('lib-modal');
+    toast('📚 Book added to library!');
+    loadLibrary();
+  }catch(e){
+    console.error('Library upload:',e);
+    toast('❌ Could not upload: '+e.message);
+    btn.textContent='Add to Library →'; btn.disabled=false;
+    prog.style.display='none';
+  }
+}
+
+const LIB_EMOJI={fiction:'📖',history:'🏛',tech:'💻',art:'🎨',local:'📍',science:'🔬',religion:'🕌'};
+
+async function loadLibrary(){
+  const grid=$('lib-grid');
+  grid.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
+  try{
+    const snap=await fs.getDocs(fs.collection(db,'library'));
+    let books=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // sort newest first
+    books.sort((a,b)=>{
+      const ta=a.created_at?.toMillis?a.created_at.toMillis():(a.created_at||0);
+      const tb=b.created_at?.toMillis?b.created_at.toMillis():(b.created_at||0);
+      return tb-ta;
+    });
+    if(_libFilter!=='all') books=books.filter(b=>b.category===_libFilter);
+    if(!books.length){
+      grid.innerHTML='<div class="empty"><div class="ei">📚</div><p>No books yet.<br>Be the first to add one!</p></div>'; return;
+    }
+    grid.innerHTML='';
+    // Wrap in a grid container
+    const wrapper=document.createElement('div');
+    wrapper.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:13px;padding-bottom:90px;';
+    books.forEach(b=>{
+      const col=b.cc||(['#a8d5b5','#b3d4f5','#f5d4a8','#d4b8f5','#f5b8c8','#b8f5d4'])[Math.abs(b.id.charCodeAt(0))%6];
+      const card=document.createElement('div');
+      card.className='bc';
+      card.onclick=()=>openPDFReader(b);
+      card.innerHTML=\`<div class="bcv" style="background:\${col||'#e8f5ee'};flex-direction:column;gap:4px;">
+        <div style="font-size:32px;">\${LIB_EMOJI[b.category]||'📖'}</div>
+        <div style="font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,.3);padding:2px 7px;border-radius:4px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${esc(b.category||'book').toUpperCase()}</div>
+      </div>
+      <div class="bi">
+        <div class="bt">\${esc(b.title)}</div>
+        <div class="ba" style="margin-top:2px;">✍️ \${esc(b.author_name)}</div>
+        \${b.publisher?'<div class="ba">🏢 '+esc(b.publisher)+'</div>':''}
+        \${b.year?'<div class="ba">📅 '+esc(b.year)+'</div>':''}
+        <div style="margin-top:5px;font-size:11px;color:var(--G);font-weight:700;">📄 PDF · Free</div>
+      </div>\`;
+      wrapper.appendChild(card);
+    });
+    grid.appendChild(wrapper);
+  }catch(e){
+    grid.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Could not load library.<br>Check your connection.</p></div>';
+    console.error('Library:',e);
+  }
+}
+
+function openPDFReader(book){
+  $('pdf-reader-title').textContent=book.title||'Book';
+  const body=$('pdf-reader-body');
+  body.innerHTML='<p style="color:#fff;text-align:center;padding:40px 16px;">Loading PDF...</p>';
+  // Set download link
+  const dl=$('pdf-download-link');
+  if(book.pdf_data){ dl.href=book.pdf_data; dl.download=book.pdf_name||'book.pdf'; dl.style.display='flex'; }
+  else { dl.style.display='none'; }
+  navTo('pg-pdfreader');
+  if(book.pdf_data){
+    // Embed PDF using an iframe with the base64 data
+    setTimeout(()=>{
+      body.innerHTML='';
+      const iframe=document.createElement('iframe');
+      iframe.style.cssText='width:100%;height:100%;border:none;display:block;';
+      iframe.src=book.pdf_data;
+      body.style.overflow='hidden';
+      body.style.padding='0';
+      body.appendChild(iframe);
+    },100);
+  } else {
+    body.innerHTML='<div style="padding:20px;color:#fff;"><h2 style="margin-bottom:10px;">'+esc(book.title)+'</h2><p>'+esc(book.description||'No content.')+'</p></div>';
+  }
+}
 
 waitForFirebase();
 </script>
