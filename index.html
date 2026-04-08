@@ -658,8 +658,11 @@ textarea.inp{resize:none}
     <div class="about-block" id="up-about-block" style="display:none;margin-top:12px;">
       <h4>About</h4><p id="up-about-text"></p>
     </div>
-    <div style="padding:13px 12px 6px;">
-      <button class="btn" id="follow-btn" onclick="toggleFollow()">Follow</button>
+    <div style="padding:13px 12px 6px;display:flex;gap:9px;">
+      <button class="btn" id="up-addfriend-btn" style="flex:1;font-size:14px;padding:12px;"
+        onclick="onAddFriendTap()">+ Add Friend</button>
+      <button class="btn" id="up-msg-btn" style="flex:1;font-size:14px;padding:12px;background:var(--G2);"
+        onclick="onMessageTap()">💬 Message</button>
     </div>
     <div class="sec-title">Posts</div>
     <div class="pgrid" id="up-pgrid"></div>
@@ -1438,13 +1441,19 @@ function loadMsgs(){
   wrap.innerHTML='<div class="day-div">Loading...</div>';
   if(_chatUnsub){_chatUnsub();_chatUnsub=null;}
   try{
-    const q=fs.query(fs.collection(db,'convs',cid,'msgs'),fs.orderBy('ts','asc'),fs.limit(100));
+    const q=fs.query(fs.collection(db,'convs',cid,'msgs'),fs.limit(100));
     _chatUnsub=fs.onSnapshot(q,snap=>{
       wrap.innerHTML='';
       if(snap.empty){wrap.innerHTML='<div class="day-div">Say hello 👋</div>';return;}
+      // Sort by timestamp in JS — no Firestore index needed
+      const msgs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      msgs.sort((a,b)=>{
+        const ta=a.ts?.toMillis?a.ts.toMillis():(a.ts||0);
+        const tb=b.ts?.toMillis?b.ts.toMillis():(b.ts||0);
+        return ta-tb;
+      });
       let lastDay='';
-      snap.docs.forEach(d=>{
-        const m={id:d.id,...d.data()};
+      msgs.forEach(m=>{
         const ts=m.ts?.toMillis?m.ts.toMillis():m.ts||Date.now();
         const day=new Date(ts).toLocaleDateString();
         if(day!==lastDay){
@@ -1486,14 +1495,7 @@ async function sendMsg(){
   }catch(e){toast('Could not send. Check internet.');inp.value=text;}
 }
 
-function addMsgBtn(){
-  if(!_viewingUserId||$('msg-btn'))return;
-  const fp=$('follow-btn');if(!fp)return;
-  const b=document.createElement('button');
-  b.id='msg-btn';b.className='btn-outline';b.style.marginTop='8px';b.textContent='💬 Message';
-  b.onclick=()=>openChat(_viewingUserId,_viewingUserName||'User',_viewingUserAvatar||'');
-  fp.parentElement.appendChild(b);
-}
+// addMsgBtn replaced by onMessageTap
 
 // ═══════════════════════════════════════════════════════
 //  BOOK READER + UPLOAD
@@ -1811,24 +1813,80 @@ async function checkFriendRequests(){
   }catch(e){ console.warn('checkFriendRequests:', e); }
 }
 
-// ── Update add friend button on user profile ───────────────────
-function updateAddFriendBtn(uid){
-  var btn = document.getElementById('add-friend-btn');
+// ── Refresh the Add Friend button on the user profile page ─────
+function refreshAddFriendBtn(uid){
+  var btn = document.getElementById('up-addfriend-btn');
   if(!btn) return;
   var status = getFriendStatus(uid);
   if(status === 'friends'){
-    btn.textContent = '✓ Friends'; btn.style.background='var(--bg)';
-    btn.style.color='var(--muted)'; btn.style.border='1.5px solid var(--border)';
+    btn.textContent = '✓ Friends';
+    btn.style.background = 'var(--bg)';
+    btn.style.color = 'var(--muted)';
+    btn.style.border = '1.5px solid var(--border)';
   } else if(status === 'sent'){
-    btn.textContent = 'Request Sent'; btn.style.background='var(--bg)';
-    btn.style.color='var(--muted)'; btn.style.border='1.5px solid var(--border)';
+    btn.textContent = '⏳ Request Sent';
+    btn.style.background = 'var(--bg)';
+    btn.style.color = 'var(--muted)';
+    btn.style.border = '1.5px solid var(--border)';
   } else if(status === 'received'){
-    btn.textContent = 'Accept Request'; btn.style.background='var(--G)';
-    btn.style.color='#fff'; btn.style.border='none';
+    btn.textContent = '✅ Accept Request';
+    btn.style.background = 'var(--GL)';
+    btn.style.color = 'var(--G2)';
+    btn.style.border = 'none';
   } else {
-    btn.textContent = '+ Add Friend'; btn.style.background='var(--G)';
-    btn.style.color='#fff'; btn.style.border='none';
+    btn.textContent = '+ Add Friend';
+    btn.style.background = 'var(--G)';
+    btn.style.color = '#fff';
+    btn.style.border = 'none';
   }
+}
+
+// ── Keep old name for compatibility ─────────────────────────────
+function updateAddFriendBtn(uid){ refreshAddFriendBtn(uid); }
+
+// ── Tap Add Friend button ────────────────────────────────────────
+async function onAddFriendTap(){
+  var uid = _viewingUserId;
+  if(!uid || !CU){ toast('Sign in to add friends'); return; }
+  var status = getFriendStatus(uid);
+  if(status === 'friends'){
+    if(confirm('Remove ' + _viewingUserName + ' from friends?')){
+      await removeFriend(uid);
+      refreshAddFriendBtn(uid);
+    }
+    return;
+  }
+  if(status === 'sent'){
+    toast('Friend request already sent. Waiting for response.');
+    return;
+  }
+  if(status === 'received'){
+    // They already sent us a request — accept it
+    try{
+      var snap = await fs.getDocs(fs.query(
+        fs.collection(db,'friend_requests'),
+        fs.where('from_uid','==',uid),
+        fs.where('to_uid','==',CU.id),
+        fs.where('status','==','pending'),
+        fs.limit(1)
+      ));
+      var reqId = snap.docs.length ? snap.docs[0].id : '';
+      await acceptFriendRequest(uid, reqId);
+      refreshAddFriendBtn(uid);
+    }catch(e){ toast('Could not accept. Try again.'); }
+    return;
+  }
+  // Send new request
+  await sendFriendRequest(uid, _viewingUserName, _viewingUserAvatar);
+  refreshAddFriendBtn(uid);
+}
+
+// ── Tap Message button ───────────────────────────────────────────
+function onMessageTap(){
+  var uid = _viewingUserId;
+  if(!uid || !CU){ toast('Sign in to send messages'); return; }
+  if(!_viewingUserName){ toast('Loading user info...'); return; }
+  openChat(uid, _viewingUserName, _viewingUserAvatar || '');
 }
 
 
@@ -1949,6 +2007,8 @@ function shareActivePost(){
 //  FOLLOW SYSTEM
 // ═══════════════════════════════════════════════════════════════════
 let _viewingUserId = null; // user being viewed in userprofile page
+let _viewingUserName = '';
+let _viewingUserAvatar = '';
 
 async function viewUserProfile(uid){
   if(!uid) return;
@@ -1960,6 +2020,9 @@ async function viewUserProfile(uid){
     const snap = await fs.getDoc(fs.doc(db,'users',uid));
     if(!snap.exists()){ toast('User not found'); return; }
     const u = {id:uid,...snap.data()};
+    // Store for message/friend buttons
+    _viewingUserName   = u.full_name || 'User';
+    _viewingUserAvatar = u.avatar_url || '';
     // Fill in UI
     $('up-handle').textContent = '@'+(u.username||'user');
     $('up-name').textContent   = u.full_name||'—';
@@ -1979,39 +2042,8 @@ async function viewUserProfile(uid){
     else $('up-about-block').style.display='none';
     // Check if already following
     loadUserPosts(uid);
-    setTimeout(function(){
-      // Remove old buttons
-      var old = document.getElementById('add-friend-btn');
-      if(old) old.remove();
-      var oldm = document.getElementById('msg-btn');
-      if(oldm) oldm.remove();
-      // Add Friend button
-      var fp = document.getElementById('follow-btn');
-      if(fp && fp.parentElement){
-        // Replace follow btn with Add Friend
-        fp.style.display='none';
-        var afb = document.createElement('button');
-        afb.id='add-friend-btn'; afb.className='btn';
-        afb.style.flex='1'; afb.style.padding='12px'; afb.style.fontSize='14px';
-        afb.onclick=function(){
-          var st=getFriendStatus(uid);
-          if(st==='received'){ 
-            // Find the request and accept it
-            fs.getDocs(fs.query(fs.collection(db,'friend_requests'),
-              fs.where('from_uid','==',uid),fs.where('to_uid','==',CU.id),
-              fs.where('status','==','pending'),fs.limit(1)
-            )).then(function(s){ acceptFriendRequest(uid, s.docs[0]?s.docs[0].id:''); });
-          } else { sendFriendRequest(uid,_viewingUserName,_viewingUserAvatar); }
-        };
-        fp.parentElement.insertBefore(afb, fp);
-        updateAddFriendBtn(uid);
-        // Message button
-        var mb = document.createElement('button');
-        mb.id='msg-btn'; mb.className='btn-outline'; mb.style.marginTop='8px'; mb.textContent='💬 Message';
-        mb.onclick=function(){ openChat(uid,_viewingUserName||'User',_viewingUserAvatar||''); };
-        fp.parentElement.appendChild(mb);
-      }
-    },150);
+    // Update the static Add Friend button state
+    refreshAddFriendBtn(uid);
   }catch(e){ toast('Could not load profile.'); }
 }
 
@@ -2238,15 +2270,21 @@ async function loadNotifications(){
     });
     listEl.innerHTML='';
     notifs.forEach(d=>{
-      const n=d.id?{id:d.id,...d.data()}:d;
+      const n=d;  // already a plain object from sorted array
       const div=document.createElement('div');
       div.className='notif-item'+(n.read?'':' unread');
       const bgC=COLORS[strHash(n.from_uid||n.id)%COLORS.length];
-      const msg = n.type==='like'?`liked your post`
-                : n.type==='follow'?`started following you`
-                : n.type==='comment'?`commented on your post`
-                : 'interacted with you';
-      const icon= n.type==='like'?'❤️':n.type==='follow'?'👤':n.type==='comment'?'💬':'🔔';
+      var msg = n.type==='like' ? 'liked your post'
+              : n.type==='follow' ? 'started following you'
+              : n.type==='comment' ? 'commented on your post'
+              : n.type==='friend_request' ? 'sent you a friend request 👥'
+              : n.type==='friend_accepted' ? 'accepted your friend request ✅'
+              : n.type==='message' ? 'sent you a message 💬'
+              : 'interacted with you';
+    var icon = n.type==='like'?'❤️':n.type==='follow'?'👤':n.type==='comment'?'💬'
+              :n.type==='friend_request'?'👥':n.type==='friend_accepted'?'✅'
+              :n.type==='message'?'💬':'🔔';
+      // icon defined above
       div.innerHTML=`
         <div class="notif-avi" style="background:${bgC}22;">
           ${n.from_avatar?`<img src="${n.from_avatar}" onerror="this.style.display='none'" alt=""/>`:icon}
