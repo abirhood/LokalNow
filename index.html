@@ -567,7 +567,7 @@ textarea.inp{resize:none}
     <div class="sbar" style="margin-top:-18px;position:relative;z-index:5;">
       <div class="si"><div class="sn" id="sp-posts">0</div><div class="sl">Posts</div></div>
       <div class="si"><div class="sn" id="sp-followers">0</div><div class="sl">Followers</div></div>
-      <div class="si"><div class="sn" id="sp-following">0</div><div class="sl">Following</div></div>
+      <div class="si" onclick="switchTab('friends')" style="cursor:pointer;"><div class="sn" id="sp-friends">0</div><div class="sl">Friends</div></div>
       <div class="si"><div class="sn" id="sp-likes">0</div><div class="sl">Likes</div></div>
     </div>
     <div style="display:flex;gap:9px;padding:13px 12px 6px;">
@@ -997,6 +997,9 @@ function doLogout(){
 function launchApp(){
   $('nav').classList.add('on');if(CU)window._currentUID=CU.id;
   getLocation();showPage('pg-feed');
+  // Check for pending deep link after login
+  const pendingPost = sessionStorage.getItem('pending_post');
+  if(pendingPost){ sessionStorage.removeItem('pending_post'); setTimeout(()=>scrollToPost(pendingPost),1500); }
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   const nb=$('nb-feed');if(nb)nb.classList.add('on');
   history.replaceState({page:'pg-feed'},'');history.pushState({page:'pg-feed'},'');
@@ -1042,6 +1045,7 @@ function renderFeed(posts){
   el.innerHTML='';
   posts.forEach((post,i)=>{
     const card=document.createElement('div');
+    card.id='post-card-'+post.id;
     card.className='post'+(post.ai_flag?' flagged':'');
     card.style.animationDelay=(i*.05)+'s';
     const liked=Array.isArray(post.likes)&&CU&&post.likes.includes(CU.id);
@@ -1182,11 +1186,16 @@ async function deleteCmt(postId,cmtId){
   }catch(e){toast('Could not delete comment.')}
 }
 
-function sharePost(id){
-  const base=location.href.split('?')[0];
-  const url=base+'?post='+id;
-  if(navigator.share)navigator.share({title:'LokalNow Post',url});
-  else{navigator.clipboard?.writeText(url);toast('📋 Post link copied!')}
+function sharePost(postId){
+  // Build a deep link — when opened, app will scroll to this post
+  const base = location.href.split('?')[0].split('#')[0];
+  const url  = base + '?post=' + postId;
+  if(navigator.share){
+    navigator.share({title:'Check out this post on LokalNow!', url});
+  } else {
+    navigator.clipboard?.writeText(url);
+    toast('📋 Post link copied! Share it with anyone.');
+  }
 }
 function openMaps(lat,lng){window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank')}
 
@@ -1284,7 +1293,10 @@ async function loadProfile(){
   $('pn').textContent=CU.full_name||'—';$('ph2').textContent='@'+(CU.username||'—');
   const lv=CU.verification_level;$('pbadge').textContent=lv==='gold'?'🥇 Gold Verified':lv==='silver'?'✅ Verified':'🔵 Basic Member';
   $('ptrusted').style.display=CU.is_trusted_local?'inline-block':'none';
-  $('sp-posts').textContent=fmtN(CU.posts_count||0);$('sp-followers').textContent=fmtN(CU.followers_count||0);$('sp-following').textContent=fmtN(CU.following_count||0);$('sp-likes').textContent=fmtN(CU.likes_received||0);
+  $('sp-posts').textContent=fmtN(CU.posts_count||0);$('sp-followers').textContent=fmtN(CU.followers_count||0);$('sp-following') && ($('sp-following').textContent=fmtN(CU.following_count||0));
+  // Friends count = number of friends in local list
+  const spf=document.getElementById('sp-friends');
+  if(spf) spf.textContent=fmtN(getFriendUIDs().length);$('sp-likes').textContent=fmtN(CU.likes_received||0);
   const ab=$('about-block');if(CU.about){ab.style.display='block';$('about-text').textContent=CU.about}else{ab.style.display='none'}
   const grid=$('pgrid');grid.innerHTML='<div style="grid-column:span 3;text-align:center;padding:24px;color:var(--muted);">Loading...</div>';
   try{
@@ -1403,14 +1415,22 @@ async function openDMInbox(){
   const el=$('dm-list');
   el.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
   try{
+    // No orderBy — avoids needing a Firestore composite index
     const q=fs.query(fs.collection(db,'convs'),
       fs.where('members','array-contains',CU.id),
-      fs.orderBy('updated_at','desc'),fs.limit(30));
-    const snap=await fs.getDocs(q);
-    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.<br>Find a friend and send a message!</p></div>';return;}
+      fs.limit(30));
+    let snap=await fs.getDocs(q);
+    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.<br>Open a friend profile and tap Message!</p></div>';return;}
     el.innerHTML='';
-    snap.docs.forEach(d=>{
-      const c={id:d.id,...d.data()};
+    // Sort by most recent message in JS
+    const convDocs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    convDocs.sort((a,b)=>{
+      const ta=a.updated_at?.toMillis?a.updated_at.toMillis():(a.updated_at||0);
+      const tb=b.updated_at?.toMillis?b.updated_at.toMillis():(b.updated_at||0);
+      return tb-ta;
+    });
+    convDocs.forEach(d=>{
+      const c=d;  // already plain object from sorted array
       const pid=c.members.find(m=>m!==CU.id)||'';
       const pname=c.names?.[pid]||'User';
       const pavi=c.avatars?.[pid]||'';
@@ -1898,12 +1918,83 @@ function onMessageTap(){
 }
 
 
+// ── DEEP LINK: scroll to a specific post ──────────────────────
+async function scrollToPost(postId){
+  // Make sure we are on the feed page
+  switchTab('feed');
+  // Wait for feed to render then find the post card
+  await new Promise(r=>setTimeout(r,800));
+  // Look for an existing card
+  let card = document.getElementById('post-card-'+postId);
+  if(card){
+    card.scrollIntoView({behavior:'smooth',block:'center'});
+    card.style.outline='3px solid var(--G)';
+    setTimeout(()=>card.style.outline='',2000);
+    return;
+  }
+  // Post not in current feed — fetch it directly and show it
+  try{
+    const snap=await fs.getDoc(fs.doc(db,'posts',postId));
+    if(!snap.exists()){toast('Post not found or deleted.');return;}
+    const post={id:snap.id,...snap.data()};
+    // Show in a modal overlay
+    showPostModal(post);
+  }catch(e){toast('Could not load post.');}
+}
+
+function showPostModal(post){
+  // Reuse lightbox-style overlay to show the single post
+  const existing=document.getElementById('post-modal-bg');
+  if(existing) existing.remove();
+  const bg=document.createElement('div');
+  bg.id='post-modal-bg';
+  bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:flex-end;';
+  bg.onclick=function(e){if(e.target===bg)bg.remove();};
+  const liked=Array.isArray(post.likes)&&CU&&post.likes.includes(CU.id);
+  const lc=Array.isArray(post.likes)?post.likes.length:0;
+  const bgC=COLORS[strHash(post.uid||post.id)%COLORS.length];
+  bg.innerHTML=`<div style="background:#fff;border-radius:22px 22px 0 0;width:100%;max-height:90%;overflow-y:auto;padding-bottom:20px;">
+    <div style="display:flex;align-items:center;padding:14px 14px 8px;gap:10px;">
+      <div class="avi" style="background:${bgC}22;border:2px solid ${bgC};cursor:pointer;" onclick="viewUserProfile('${post.uid}')">
+        ${post.avatar_url?`<img src="${post.avatar_url}" onerror="this.style.display='none'" alt=""/>`:initial(post.full_name||'?')}
+      </div>
+      <div style="flex:1;"><div style="font-weight:700;font-size:14px;">${esc(post.full_name||'User')}</div>
+        <div style="font-size:11px;color:var(--muted);">📍 ${esc(post.location_name||post.city||'Local')} · ${fmtTime(post.created_at||post.ts)}</div>
+      </div>
+      <button onclick="document.getElementById('post-modal-bg').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+    ${post.media_url?`<img src="${post.media_url}" style="width:100%;max-height:60vw;object-fit:cover;" alt="post"/>`:
+      `<div style="width:100%;height:200px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:56px;">${EMOJI[post.category]||'📸'}</div>`}
+    ${post.caption?`<div style="padding:10px 14px;font-size:14px;line-height:1.5;"><b>${esc(post.username||'user')}</b> ${esc(post.caption)}</div>`:''}
+    <div style="display:flex;align-items:center;padding:6px 10px;gap:4px;">
+      <button class="ab ${liked?'liked':''}" onclick="toggleLike('${post.id}',${liked})">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="${liked?'var(--red)':'none'}"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        ${lc}
+      </button>
+      ${post.latitude?`<button class="go-btn" onclick="openMaps(${post.latitude},${post.longitude})" style="margin-left:auto;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="width:13px;height:13px;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>Go There
+      </button>`:''}
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(bg);
+}
+
 function boot(){
   db=window._db;fs=window._fs;
   try{const sess=localStorage.getItem('ln_sess');if(sess){CU=JSON.parse(sess);if(CU)window._currentUID=CU.id}}catch(e){}
   setTimeout(()=>{
-    if(CU){launchApp()}
-    else{showPage('pg-login');history.replaceState({page:'pg-login'},'')}
+    if(CU){
+      launchApp();
+      // Handle ?post=ID deep link
+      const linked=new URLSearchParams(window.location.search).get('post');
+      if(linked) setTimeout(()=>scrollToPost(linked),1500);
+    } else {
+      showPage('pg-login');
+      history.replaceState({page:'pg-login'},'');
+      // Save deep link for after login
+      const lp=new URLSearchParams(window.location.search).get('post');
+      if(lp) sessionStorage.setItem('pending_post',lp);
+    }
   },2400);
 }
 function waitForFirebase(attempt=0){
