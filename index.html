@@ -490,7 +490,10 @@ textarea.inp{resize:none}
     <div class="chip" onclick="setFeedCat(this,'travel')">✈️ Travel</div>
     <div class="chip" onclick="setFeedCat(this,'sport')">⚽ Sport</div>
   </div>
-  <div class="scroll" id="feed-list"><div class="empty"><div class="ei">⏳</div><p>Loading...</p></div></div>
+  <div id="ptr-indicator" style="display:none;text-align:center;padding:10px;color:var(--G);font-size:13px;font-weight:600;flex-shrink:0;">
+    <span style="display:inline-block;animation:rot .8s linear infinite;">🔄</span> Refreshing...
+  </div>
+  <div class="scroll" id="feed-list" onscroll="onFeedScroll(this)"><div class="empty"><div class="ei">⏳</div><p>Loading...</p></div></div>
 </div>
 
 <!-- MAP -->
@@ -696,16 +699,26 @@ textarea.inp{resize:none}
   <div class="topbar">
     <button class="ib back" onclick="history.back()"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
     <div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0;cursor:pointer;" onclick="viewUserProfile(_chatUid)">
-      <div id="chat-avi" style="width:36px;height:36px;border-radius:50%;background:var(--GBg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;overflow:hidden;flex-shrink:0;"></div>
-      <div><div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--G2);" id="chat-name">—</div><div style="font-size:11px;color:var(--muted);">Tap to view profile</div></div>
+      <div style="position:relative;flex-shrink:0;">
+        <div id="chat-avi" style="width:36px;height:36px;border-radius:50%;background:var(--GBg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;overflow:hidden;"></div>
+        <span id="chat-online-dot" style="display:none;position:absolute;bottom:1px;right:1px;width:10px;height:10px;background:#2ecc71;border-radius:50%;border:2px solid #fff;"></span>
+      </div>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--G2);" id="chat-name">—</div>
+        <div style="font-size:11px;color:var(--muted);" id="chat-status">Tap to view profile</div>
+      </div>
     </div>
   </div>
   <div class="chat-wrap" id="chat-msgs"></div>
   <div class="chat-bar">
+    <button class="ib" onclick="pickChatPhoto()" style="flex-shrink:0;color:var(--muted);">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    </button>
     <input class="chat-inp" id="chat-inp" placeholder="Type a message..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"/>
     <button class="chat-send-btn" onclick="sendMsg()"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
   </div>
 </div>
+<input type="file" id="fi-chat-photo" accept="image/*" style="display:none" onchange="onChatPhoto(event)"/>
 
 <!-- BOOK READER -->
 <div class="page" id="pg-reader" style="flex-direction:column;">
@@ -716,10 +729,15 @@ textarea.inp{resize:none}
   <div class="reader-body" id="reader-body"><p style="color:var(--muted);text-align:center;padding-top:40px;">Loading...</p></div>
 </div>
 
-<!-- LIGHTBOX -->
-<div class="lb-bg" id="lightbox" onclick="closeLightbox()">
-  <button class="lb-close" onclick="closeLightbox()">✕</button>
-  <img class="lb-img" id="lb-img" alt=""/>
+<!-- LIGHTBOX / POST VIEWER (Facebook-style) -->
+<div class="lb-bg" id="lightbox" onclick="if(event.target===this)closeLightbox()" style="flex-direction:column;align-items:stretch;background:rgba(0,0,0,.97);overflow-y:auto;">
+  <div style="display:flex;align-items:center;padding:12px 14px;flex-shrink:0;">
+    <button class="lb-close" onclick="closeLightbox()" style="position:static;margin-right:12px;background:rgba(255,255,255,.1);">✕</button>
+    <div id="lb-post-header" style="flex:1;display:flex;align-items:center;gap:10px;"></div>
+  </div>
+  <img class="lb-img" id="lb-img" alt="" style="max-width:100%;max-height:65vh;object-fit:contain;display:block;margin:0 auto;flex-shrink:0;" onclick=""/>
+  <div id="lb-caption" style="padding:12px 16px;color:#fff;font-size:14px;line-height:1.6;flex-shrink:0;"></div>
+  <div id="lb-actions" style="display:flex;gap:4px;padding:4px 10px 16px;flex-shrink:0;"></div>
 </div>
 
 <!-- FRIENDS PAGE -->
@@ -834,7 +852,10 @@ textarea.inp{resize:none}
 <!-- Post Action Sheet -->
 <div class="mbg" id="post-action-modal" onclick="if(event.target===this)closeModal('post-action-modal')">
   <div class="modal action-sheet" style="padding:0;">
-    <div class="as-item danger" onclick="confirmDeletePost()">
+    <div class="as-item" id="post-edit-btn" onclick="openEditPostModal()" style="display:none;">
+      <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit Post
+    </div>
+    <div class="as-item danger" id="post-delete-btn" onclick="confirmDeletePost()" style="display:none;">
       <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>Delete Post
     </div>
     <div class="as-item" onclick="shareActivePost()">
@@ -843,6 +864,20 @@ textarea.inp{resize:none}
     <div class="as-item" onclick="closeModal('post-action-modal')" style="color:var(--muted);">
       <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>Cancel
     </div>
+  </div>
+</div>
+<!-- Edit Post Modal -->
+<div class="mbg" id="edit-post-modal" onclick="if(event.target===this)closeModal('edit-post-modal')">
+  <div class="modal">
+    <div class="mrow"><div class="mt">✏️ Edit Post</div><button class="ib" onclick="closeModal('edit-post-modal')"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div id="ep-photo-preview" onclick="pickEditPostPhoto()" style="width:100%;aspect-ratio:4/3;background:var(--bg);border-radius:14px;overflow:hidden;cursor:pointer;position:relative;margin-bottom:12px;display:flex;align-items:center;justify-content:center;">
+      <img id="ep-img" alt="" style="width:100%;height:100%;object-fit:cover;display:none;"/>
+      <div id="ep-placeholder" style="text-align:center;color:var(--muted);font-size:13px;">📷 Tap to change photo</div>
+    </div>
+    <input type="file" id="fi-edit-post" accept="image/*" style="display:none" onchange="onEditPostPhoto(event)"/>
+    <div class="fl">CAPTION</div>
+    <textarea class="inp" id="ep-cap" placeholder="Write a caption..." rows="3"></textarea>
+    <button class="btn" id="ep-save-btn" onclick="saveEditedPost()">Save Changes ✓</button>
   </div>
 </div>
 <!-- Library Upload Modal -->
@@ -1082,7 +1117,7 @@ function launchApp(){
   history.replaceState({page:'pg-feed'},'');history.pushState({page:'pg-feed'},'');
   loadFeed();
   // Check for unread notifications after 2s (show red dot)
-  setTimeout(checkUnreadNotifs,2000);setTimeout(checkFriendRequests,3000);setTimeout(checkUnreadDMs,2500);
+  setTimeout(checkUnreadNotifs,2000);setTimeout(checkFriendRequests,3000);setTimeout(checkUnreadDMs,2500);setTimeout(setOnline,1000);
 }
 
 // ── LOCATION ──────────────────────────────────────────────
@@ -1148,7 +1183,7 @@ function renderFeed(posts){
         </div>
       </div>
       ${post.ai_flag?'<div class="ai-warn">⚠️ AI-generated content detected — under review</div>':''}
-      <div class="pi-wrap">
+      <div class="pi-wrap" onclick="openPostLightbox('${post.id}')" style="cursor:pointer;">
         <div class="pi-ph" id="ph-${post.id}">${EMOJI[post.category]||'📸'}</div>
         <img class="pi" id="pi-${post.id}" alt="" style="display:none;"/>
         ${!post.ai_flag?'<div class="ob">✅ ORIGINAL</div>':''}
@@ -1264,14 +1299,14 @@ async function deleteCmt(postId,cmtId){
 }
 
 function sharePost(postId){
-  // Build a deep link — when opened, app will scroll to this post
-  const base = location.href.split('?')[0].split('#')[0];
-  const url  = base + '?post=' + postId;
+  const base = (location.origin + location.pathname).replace(/\/+$/,'');
+  const url  = base + '?post=' + encodeURIComponent(postId);
   if(navigator.share){
-    navigator.share({title:'Check out this post on LokalNow!', url});
+    navigator.share({title:'Check out this post on LokalNow!', url}).catch(()=>{});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(()=>toast('📋 Post link copied!'),()=>toast('Link: '+url));
   } else {
-    navigator.clipboard?.writeText(url);
-    toast('📋 Post link copied! Share it with anyone.');
+    prompt('Copy this link:', url);
   }
 }
 function openMaps(lat,lng){window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank')}
@@ -1395,8 +1430,9 @@ async function loadProfile(){
       var lf=liked?' fill="var(--red)"':'';
       card.innerHTML='<div class="pa" style="padding:10px 13px 6px;">'
         +'<div style="flex:1;">'
-        +'<div style="font-weight:700;font-size:13px;">'+esc(p.location_name||p.city||'Local')+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">'+fmtTime(p.created_at||p.ts)+'</div>'
+        +'<div style="font-weight:700;font-size:14px;">'+esc(p.full_name||CU.full_name||'User')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);">📍 '+esc(p.location_name||p.city||'Local')+' · '+fmtTime(p.created_at||p.ts)+'</div>'
+        +'</div>'
         +'</div>'
         +'<button class="post-menu-btn" data-pid="'+p.id+'" data-puid="'+p.uid+'" onclick="openPostMenu(this.dataset.pid,this.dataset.puid)">'
         +'<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/>'
@@ -1404,7 +1440,7 @@ async function loadProfile(){
         +'<circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>'
         +'</button></div>'
         +lh
-        +'<div class="pi-wrap">'
+        +'<div class="pi-wrap" style="cursor:pointer;" data-pid2="'+pid+'" onclick="openPostLightboxById(this.dataset.pid2)">'
         +'<div class="pi-ph" id="ph-pr-'+p.id+'">'+( EMOJI[p.category]||'📸')+'</div>'
         +'<img class="pi" id="pi-pr-'+p.id+'" alt="" style="display:none;"/>'
         +'</div>'
@@ -1512,45 +1548,44 @@ let _chatUid=null,_chatName='',_chatAvatar='',_chatUnsub=null;
 
 function convId(a,b){return [a,b].sort().join('_');}
 
+let _inboxUnsub=null;
 async function openDMInbox(){
   if(!CU){toast('Sign in to use messages');return;}
-  // Clear DM badge when opening inbox
   const badge=$('dm-count-badge');if(badge){badge.textContent='';badge.classList.remove('on');}
   navTo('pg-dms');
   const el=$('dm-list');
   el.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
+  if(_inboxUnsub){_inboxUnsub();_inboxUnsub=null;}
   try{
-    // No orderBy — avoids needing a Firestore composite index
-    const q=fs.query(fs.collection(db,'convs'),
-      fs.where('members','array-contains',CU.id),
-      fs.limit(30));
-    let snap=await fs.getDocs(q);
-    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.<br>Open a friend profile and tap Message!</p></div>';return;}
-    el.innerHTML='';
-    // Sort by most recent message in JS
-    const convDocs=snap.docs.map(d=>({id:d.id,...d.data()}));
-    convDocs.sort((a,b)=>{
-      const ta=a.updated_at?.toMillis?a.updated_at.toMillis():(a.updated_at||0);
-      const tb=b.updated_at?.toMillis?b.updated_at.toMillis():(b.updated_at||0);
-      return tb-ta;
-    });
-    convDocs.forEach(d=>{
-      const c=d;  // already plain object from sorted array
-      const pid=c.members.find(m=>m!==CU.id)||'';
-      const pname=c.names?.[pid]||'User';
-      const pavi=c.avatars?.[pid]||'';
-      const bgC=COLORS[strHash(pid)%COLORS.length];
-      const div=document.createElement('div');
-      div.className='dm-item';
-      div.onclick=()=>openChat(pid,pname,pavi);
-      div.innerHTML=`<div class="dm-avi" style="background:${bgC}22;">${pavi?`<img src="${pavi}" onerror="this.style.display='none'" alt=""/>`:initial(pname)}</div>
-        <div style="flex:1;min-width:0;"><div class="dm-name">${esc(pname)}</div><div class="dm-prev">${esc(c.last||'')}</div></div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-          <div class="dm-time">${fmtTime(c.updated_at||Date.now())}</div>
-          ${!c.read_by?.includes(CU.id)?'<div class="dm-dot"></div>':''}
-        </div>`;
-      el.appendChild(div);
-    });
+    const q=fs.query(fs.collection(db,'convs'),fs.where('members','array-contains',CU.id),fs.limit(30));
+    _inboxUnsub=fs.onSnapshot(q,snap=>{
+      if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.<br>Open a friend profile and tap Message!</p></div>';return;}
+      const convDocs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      convDocs.sort((a,b)=>{
+        const ta=a.updated_at?.toMillis?a.updated_at.toMillis():(a.updated_at||0);
+        const tb=b.updated_at?.toMillis?b.updated_at.toMillis():(b.updated_at||0);
+        return tb-ta;
+      });
+      el.innerHTML='';
+      convDocs.forEach(c=>{
+        const pid=c.members.find(m=>m!==CU.id)||'';
+        const pname=c.names?.[pid]||'User';
+        const pavi=c.avatars?.[pid]||'';
+        const bgC=COLORS[strHash(pid)%COLORS.length];
+        const unread=c.last_uid&&c.last_uid!==CU.id&&!(c.read_by||[]).includes(CU.id);
+        const div=document.createElement('div');
+        div.className='dm-item';
+        div.onclick=()=>openChat(pid,pname,pavi);
+        const aviHtml=pavi?'<img src="'+pavi+'" onerror="this.style.display=\'none\'" alt=""/>':initial(pname);
+        div.innerHTML='<div class="dm-avi" style="background:'+bgC+'22;">'+aviHtml+'</div>'
+          +'<div style="flex:1;min-width:0;"><div class="dm-name">'+(unread?'<b>':'')+esc(pname)+(unread?'</b>':'')+'</div>'
+          +'<div class="dm-prev">'+esc(c.last||'')+'</div></div>'
+          +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
+          +'<div class="dm-time">'+fmtTime(c.updated_at||Date.now())+'</div>'
+          +(unread?'<div class="dm-dot"></div>':'')+'</div>';
+        el.appendChild(div);
+      });
+    },e=>{el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.</p></div>';console.warn('DM inbox:',e.message);});
   }catch(e){el.innerHTML='<div class="empty"><div class="ei">💬</div><p>No messages yet.</p></div>';console.warn('DM inbox:',e.message);}
 }
 
@@ -1558,11 +1593,12 @@ async function openChat(uid,name,avatar){
   _chatUid=uid;_chatName=name;_chatAvatar=avatar;
   const bgC=COLORS[strHash(uid)%COLORS.length];
   const aviEl=$('chat-avi');
-  if(avatar){aviEl.innerHTML=`<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.textContent='${initial(name)}'" alt=""/>`;}
+  if(avatar){aviEl.innerHTML='<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt=""/>';}
   else{aviEl.style.background=bgC+'22';aviEl.textContent=initial(name);}
   $('chat-name').textContent=name;
   navTo('pg-chat');
   loadMsgs();
+  watchOnline(uid);
 }
 
 function startNewDM(){navTo('pg-search');toast('Search for a friend to message them');}
@@ -1596,8 +1632,14 @@ function loadMsgs(){
         }
         const mine=m.uid===CU.id;
         const row=document.createElement('div');row.className='msg-row '+(mine?'mine':'other');
-        row.innerHTML=`<div class="bubble">${esc(m.text)}</div>
-          <div class="msg-time">${new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`;
+        let bubbleHtml='';
+        if(m.img_url){
+          bubbleHtml='<div class="bubble" style="padding:4px;background:transparent;">'+
+            '<img src="'+m.img_url+'" style="max-width:200px;border-radius:12px;display:block;cursor:pointer;" onclick="openImgLightbox(this.src)"/></div>';
+        } else {
+          bubbleHtml='<div class="bubble">'+esc(m.text||'')+'</div>';
+        }
+        row.innerHTML=bubbleHtml+'<div class="msg-time">'+new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</div>';
         wrap.appendChild(row);
       });
       wrap.scrollTop=wrap.scrollHeight;
@@ -2087,18 +2129,15 @@ function showPostModal(post){
 function boot(){
   db=window._db;fs=window._fs;
   try{const sess=localStorage.getItem('ln_sess');if(sess){CU=JSON.parse(sess);if(CU)window._currentUID=CU.id}}catch(e){}
+  const linked=new URLSearchParams(window.location.search).get('post');
   setTimeout(()=>{
     if(CU){
       launchApp();
-      // Handle ?post=ID deep link
-      const linked=new URLSearchParams(window.location.search).get('post');
-      if(linked) setTimeout(()=>scrollToPost(linked),1500);
+      if(linked) setTimeout(()=>scrollToPost(decodeURIComponent(linked)),1600);
     } else {
       showPage('pg-login');
       history.replaceState({page:'pg-login'},'');
-      // Save deep link for after login
-      const lp=new URLSearchParams(window.location.search).get('post');
-      if(lp) sessionStorage.setItem('pending_post',lp);
+      if(linked) sessionStorage.setItem('pending_post',decodeURIComponent(linked));
     }
   },2400);
 }
@@ -2181,9 +2220,11 @@ let _activePostUid  = null;
 function openPostMenu(postId, postUid){
   _activePostId  = postId;
   _activePostUid = postUid;
-  // Show delete only for own posts
-  const delBtn = document.querySelector('#post-action-modal .as-item.danger');
-  if(delBtn) delBtn.style.display = (CU && postUid===CU.id) ? 'flex' : 'none';
+  const isOwn = CU && postUid===CU.id;
+  const editBtn = document.getElementById('post-edit-btn');
+  const delBtn  = document.getElementById('post-delete-btn');
+  if(editBtn) editBtn.style.display = isOwn ? 'flex' : 'none';
+  if(delBtn)  delBtn.style.display  = isOwn ? 'flex' : 'none';
   openModal('post-action-modal');
 }
 
@@ -2536,26 +2577,32 @@ async function markAllRead(){
   }catch(e){}
 }
 
-// Check for unread notifications on app load
-async function checkUnreadNotifs(){
+// Live unread notification listener
+let _notifUnsub=null;
+function checkUnreadNotifs(){
   if(!CU) return;
+  if(_notifUnsub){_notifUnsub();_notifUnsub=null;}
   try{
     const q=fs.query(fs.collection(db,'notifications'),fs.where('to_uid','==',CU.id),fs.where('read','==',false),fs.limit(99));
-    const snap=await fs.getDocs(q);
-    const cnt=snap.size;
-    const badge=$('notif-count-badge');
-    if(badge){badge.textContent=cnt>9?'9+':cnt>0?cnt:'';badge.classList.toggle('on',cnt>0);}
+    _notifUnsub=fs.onSnapshot(q,snap=>{
+      const cnt=snap.size;
+      const badge=$('notif-count-badge');
+      if(badge){badge.textContent=cnt>9?'9+':cnt>0?String(cnt):'';badge.classList.toggle('on',cnt>0);}
+    },()=>{});
   }catch(e){}
 }
-async function checkUnreadDMs(){
+let _dmUnsub=null;
+function checkUnreadDMs(){
   if(!CU) return;
+  if(_dmUnsub){_dmUnsub();_dmUnsub=null;}
   try{
     const q=fs.query(fs.collection(db,'convs'),fs.where('members','array-contains',CU.id),fs.limit(50));
-    const snap=await fs.getDocs(q);
-    let cnt=0;
-    snap.docs.forEach(d=>{const c=d.data();if(c.last_uid&&c.last_uid!==CU.id&&!c.read_by?.includes(CU.id))cnt++;});
-    const badge=$('dm-count-badge');
-    if(badge){badge.textContent=cnt>9?'9+':cnt>0?cnt:'';badge.classList.toggle('on',cnt>0);}
+    _dmUnsub=fs.onSnapshot(q,snap=>{
+      let cnt=0;
+      snap.docs.forEach(d=>{const c=d.data();if(c.last_uid&&c.last_uid!==CU.id&&!(c.read_by||[]).includes(CU.id))cnt++;});
+      const badge=$('dm-count-badge');
+      if(badge){badge.textContent=cnt>9?'9+':cnt>0?String(cnt):'';badge.classList.toggle('on',cnt>0);}
+    },()=>{});
   }catch(e){}
 }
 
@@ -2592,14 +2639,19 @@ function openLibModal(){
 
 function onLibPdfFile(e){
   const file=e.target.files[0]; if(!file) return;
-  const maxMB=5;
-  if(file.size > maxMB*1024*1024){ toast('PDF too large. Max 5MB.'); return; }
+  const maxMB=0.9; // Firestore doc limit ~1MB; keep under 900KB base64 safe
+  if(file.size > maxMB*1024*1024){
+    toast('PDF too large for direct storage (max ~680KB). Please compress it first.');
+    return;
+  }
+  $('lib-zone-text').textContent='⏳ Reading file...';
   const r=new FileReader();
   r.onload=ev=>{
     _libPdfData={base64:ev.target.result, name:file.name, size:file.size};
     $('lib-zone').classList.add('has-file');
-    $('lib-zone-text').textContent='✅ '+file.name+' ('+Math.round(file.size/1024)+'KB)';
+    $('lib-zone-text').textContent='✅ '+file.name+' ('+Math.round(file.size/1024)+'KB ready)';
   };
+  r.onerror=()=>{ toast('Could not read PDF file.'); $('lib-zone-text').textContent='Tap to upload PDF file'; };
   r.readAsDataURL(file);
 }
 
@@ -2714,6 +2766,204 @@ function profileToggleLike(btn){
   var pid=btn.dataset.pid;
   var wasLiked=(btn.dataset.lk==='true');
   toggleLike(pid,wasLiked);
+}
+
+// ═══════════════════════════════════════════════════════
+// PULL TO REFRESH
+// ═══════════════════════════════════════════════════════
+let _ptrStartY=0, _ptrActive=false, _ptrDoing=false;
+function onFeedScroll(el){
+  // handled by touch events
+}
+(function initPTR(){
+  document.addEventListener('touchstart',e=>{
+    const fl=document.getElementById('feed-list');
+    if(!fl||!fl.contains(e.target))return;
+    if(fl.scrollTop===0) _ptrStartY=e.touches[0].clientY;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    const fl=document.getElementById('feed-list');
+    if(!fl||!fl.contains(e.target)||_ptrDoing)return;
+    if(fl.scrollTop===0&&e.touches[0].clientY-_ptrStartY>60){
+      _ptrActive=true;
+      const ind=document.getElementById('ptr-indicator');
+      if(ind) ind.style.display='block';
+    }
+  },{passive:true});
+  document.addEventListener('touchend',()=>{
+    if(_ptrActive&&!_ptrDoing){
+      _ptrDoing=true;
+      loadFeed();
+      setTimeout(()=>{
+        const ind=document.getElementById('ptr-indicator');
+        if(ind) ind.style.display='none';
+        _ptrDoing=false;
+      },1200);
+    }
+    _ptrActive=false; _ptrStartY=0;
+  },{passive:true});
+})();
+
+// ═══════════════════════════════════════════════════════
+// OPEN POST LIGHTBOX BY ID (for profile grid)
+// ═══════════════════════════════════════════════════════
+async function openPostLightboxById(postId){
+  try{
+    const snap=await fs.getDoc(fs.doc(db,'posts',postId));
+    if(snap.exists()){ openLightbox(snap.data().media_url, snap.data().caption, {id:snap.id,...snap.data()}); }
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════
+// OPEN POST LIGHTBOX FROM FEED (uses cached post data)
+// ═══════════════════════════════════════════════════════
+function openPostLightbox(postId){
+  // Try to find the post in the feed
+  const imgEl=document.getElementById('pi-'+postId);
+  const src=imgEl?imgEl.src:'';
+  // Get caption from DOM
+  const card=document.getElementById('post-card-'+postId);
+  if(!card){openPostLightboxById(postId);return;}
+  // Extract post info from card data attributes or just fetch
+  openPostLightboxById(postId);
+}
+
+// ═══════════════════════════════════════════════════════
+// CHAT PHOTO SENDING
+// ═══════════════════════════════════════════════════════
+function pickChatPhoto(){
+  document.getElementById('fi-chat-photo').click();
+}
+async function onChatPhoto(e){
+  const file=e.target.files[0]; if(!file) return;
+  e.target.value='';
+  if(!CU||!_chatUid){ toast('Open a chat first'); return; }
+  toast('⏳ Sending photo...');
+  try{
+    // Resize to max 800px for messages
+    const b64=await imgToBase64(file,800,0.85);
+    const cid=convId(CU.id,_chatUid);
+    const ts=fs.serverTimestamp();
+    await fs.addDoc(fs.collection(db,'convs',cid,'msgs'),{uid:CU.id,img_url:b64,text:'',ts});
+    await fs.setDoc(fs.doc(db,'convs',cid),{
+      members:[CU.id,_chatUid],
+      names:{[CU.id]:CU.full_name,[_chatUid]:_chatName},
+      avatars:{[CU.id]:CU.avatar_url||'',[_chatUid]:_chatAvatar},
+      last:'📷 Photo',updated_at:ts,last_uid:CU.id,read_by:[CU.id]
+    },{merge:true});
+    toast('✅ Photo sent!');
+  }catch(e){ toast('❌ Could not send photo: '+e.message); }
+}
+
+// ═══════════════════════════════════════════════════════
+// ONLINE PRESENCE
+// ═══════════════════════════════════════════════════════
+let _presenceUnsub=null;
+function setOnline(){
+  if(!CU||!db) return;
+  try{
+    fs.setDoc(fs.doc(db,'presence',CU.id),{uid:CU.id,online:true,last_seen:fs.serverTimestamp()},{merge:true});
+  }catch(e){}
+  // Refresh every 60s
+  setInterval(()=>{ if(CU) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:true,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){} },60000);
+  // Set offline on page unload
+  window.addEventListener('pagehide',()=>{ if(CU) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:false,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){} });
+}
+function watchOnline(uid){
+  if(_presenceUnsub){_presenceUnsub();_presenceUnsub=null;}
+  if(!uid) return;
+  try{
+    _presenceUnsub=fs.onSnapshot(fs.doc(db,'presence',uid),snap=>{
+      const dot=document.getElementById('chat-online-dot');
+      const status=document.getElementById('chat-status');
+      if(!snap||!snap.exists()){
+        if(dot) dot.style.display='none';
+        if(status) status.textContent='Tap to view profile';
+        return;
+      }
+      const d=snap.data();
+      const isOnline=d.online===true;
+      if(dot) dot.style.display=isOnline?'block':'none';
+      if(status){
+        if(isOnline){ status.textContent='🟢 Online'; status.style.color='var(--G)'; }
+        else{
+          const ls=d.last_seen?.toMillis?d.last_seen.toMillis():null;
+          status.textContent=ls?'Last seen '+fmtTime(ls):'Tap to view profile';
+          status.style.color='';
+        }
+      }
+    },()=>{});
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════
+// EDIT POST
+// ═══════════════════════════════════════════════════════
+let _editPostNewPhoto=null;
+function openEditPostModal(){
+  closeModal('post-action-modal');
+  if(!_activePostId||!CU||_activePostUid!==CU.id){toast('Cannot edit this post');return;}
+  // Load current data
+  fs.getDoc(fs.doc(db,'posts',_activePostId)).then(snap=>{
+    if(!snap.exists()) return;
+    const p=snap.data();
+    document.getElementById('ep-cap').value=p.caption||'';
+    // Show current image
+    const img=document.getElementById('ep-img');
+    const ph=document.getElementById('ep-placeholder');
+    _editPostNewPhoto=null;
+    if(p.media_url){
+      resolveMedia(p.media_url).then(src=>{
+        img.src=src||p.media_url; img.style.display='block'; ph.style.display='none';
+      });
+    } else { img.style.display='none'; ph.style.display='block'; }
+    openModal('edit-post-modal');
+  }).catch(()=>toast('Could not load post.'));
+}
+function pickEditPostPhoto(){
+  document.getElementById('fi-edit-post').click();
+}
+function onEditPostPhoto(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    _editPostNewPhoto=file;
+    const img=document.getElementById('ep-img');
+    const ph=document.getElementById('ep-placeholder');
+    img.src=ev.target.result; img.style.display='block'; ph.style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+async function saveEditedPost(){
+  if(!_activePostId||!CU||_activePostUid!==CU.id){toast('Cannot edit this post');return;}
+  const btn=document.getElementById('ep-save-btn');
+  const cap=document.getElementById('ep-cap').value.trim();
+  btn.innerHTML='<span class="spin"></span> Saving...'; btn.disabled=true;
+  try{
+    const updates={caption:cap};
+    if(_editPostNewPhoto){
+      const mediaUrl=await uploadPostPhoto(_editPostNewPhoto,()=>{});
+      updates.media_url=mediaUrl;
+      // Clear image cache for old photo
+      delete _imgCache[(_activePostId||'')];
+    }
+    await fs.updateDoc(fs.doc(db,'posts',_activePostId),updates);
+    btn.textContent='Save Changes ✓'; btn.disabled=false;
+    closeModal('edit-post-modal');
+    toast('✅ Post updated!');
+    loadFeed();
+  }catch(e){ toast('❌ Could not save: '+e.message); btn.textContent='Save Changes ✓'; btn.disabled=false; }
+}
+
+// ═══════════════════════════════════════════════════════
+// PROFILE POSTS — show name above location
+// ═══════════════════════════════════════════════════════
+function profileToggleLike(btn){
+  var pid=btn.dataset.pid;
+  var wasLiked=(btn.dataset.lk==='true');
+  toggleLike(pid,wasLiked);
+  // Update data-lk for next tap
+  btn.dataset.lk=String(!wasLiked);
 }
 
 waitForFirebase();
