@@ -1428,11 +1428,13 @@ async function loadProfile(){
       if(p.caption) lh='<div class="cap" style="padding:2px 13px 8px;"><b>'+esc(p.username||'user')+'</b> '+esc(p.caption)+'</div>';
       var lk=liked?' liked':'';
       var lf=liked?' fill="var(--red)"':'';
-      card.innerHTML='<div class="pa" style="padding:10px 13px 6px;">'
-        +'<div style="flex:1;">'
-        +'<div style="font-weight:700;font-size:14px;">'+esc(p.full_name||CU.full_name||'User')+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">📍 '+esc(p.location_name||p.city||'Local')+' · '+fmtTime(p.created_at||p.ts)+'</div>'
+      card.innerHTML='<div class="ph">'
+        +'<div class="avi" style="background:'+COLORS[strHash(p.uid||p.id)%COLORS.length]+'22;border:2px solid '+COLORS[strHash(p.uid||p.id)%COLORS.length]+';flex-shrink:0;">'
+        +(CU.avatar_url?'<img src="'+CU.avatar_url+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>':initial(p.full_name||CU.full_name||'?'))
         +'</div>'
+        +'<div style="flex:1;min-width:0;">'
+        +'<div class="post-user">'+esc(p.full_name||CU.full_name||'User')+'</div>'
+        +'<div class="post-loc">📍 '+esc(p.location_name||p.city||'Local')+' · '+fmtTime(p.created_at||p.ts)+'</div>'
         +'</div>'
         +'<button class="post-menu-btn" data-pid="'+p.id+'" data-puid="'+p.uid+'" onclick="openPostMenu(this.dataset.pid,this.dataset.puid)">'
         +'<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/>'
@@ -1440,7 +1442,7 @@ async function loadProfile(){
         +'<circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>'
         +'</button></div>'
         +lh
-        +'<div class="pi-wrap" style="cursor:pointer;" data-pid2="'+pid+'" onclick="openPostLightboxById(this.dataset.pid2)">'
+        +'<div class="pi-wrap" style="cursor:pointer;" data-pid2="'+p.id+'" onclick="openPostLightboxById(this.dataset.pid2)">'
         +'<div class="pi-ph" id="ph-pr-'+p.id+'">'+( EMOJI[p.category]||'📸')+'</div>'
         +'<img class="pi" id="pi-pr-'+p.id+'" alt="" style="display:none;"/>'
         +'</div>'
@@ -1623,7 +1625,8 @@ function loadMsgs(){
       });
       let lastDay='';
       msgs.forEach(m=>{
-        const ts=m.ts?.toMillis?m.ts.toMillis():m.ts||Date.now();
+        const rawTs=m.ts?.toMillis?m.ts.toMillis():(typeof m.ts==='number'?m.ts:Date.now());
+        const ts=rawTs||Date.now();
         const day=new Date(ts).toLocaleDateString();
         if(day!==lastDay){
           const dv=document.createElement('div');dv.className='day-div';
@@ -1632,14 +1635,28 @@ function loadMsgs(){
         }
         const mine=m.uid===CU.id;
         const row=document.createElement('div');row.className='msg-row '+(mine?'mine':'other');
-        let bubbleHtml='';
+        const timeStr=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
         if(m.img_url){
-          bubbleHtml='<div class="bubble" style="padding:4px;background:transparent;">'+
-            '<img src="'+m.img_url+'" style="max-width:200px;border-radius:12px;display:block;cursor:pointer;" onclick="openImgLightbox(this.src)"/></div>';
+          // Build image bubble using DOM to avoid huge src in innerHTML
+          const bubble=document.createElement('div');
+          bubble.className='bubble';
+          bubble.style.cssText='padding:4px;background:transparent;';
+          const img=document.createElement('img');
+          img.src=m.img_url;
+          img.style.cssText='max-width:200px;width:100%;border-radius:12px;display:block;cursor:pointer;';
+          img.onclick=()=>openImgLightbox(m.img_url);
+          bubble.appendChild(img);
+          row.appendChild(bubble);
         } else {
-          bubbleHtml='<div class="bubble">'+esc(m.text||'')+'</div>';
+          const bubble=document.createElement('div');
+          bubble.className='bubble';
+          bubble.textContent=m.text||'';
+          row.appendChild(bubble);
         }
-        row.innerHTML=bubbleHtml+'<div class="msg-time">'+new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</div>';
+        const timeEl=document.createElement('div');
+        timeEl.className='msg-time';
+        timeEl.textContent=timeStr;
+        row.appendChild(timeEl);
         wrap.appendChild(row);
       });
       wrap.scrollTop=wrap.scrollHeight;
@@ -2860,40 +2877,60 @@ async function onChatPhoto(e){
 // ═══════════════════════════════════════════════════════
 let _presenceUnsub=null;
 function setOnline(){
-  if(!CU||!db) return;
+  if(!CU||!db||!fs) return;
   try{
     fs.setDoc(fs.doc(db,'presence',CU.id),{uid:CU.id,online:true,last_seen:fs.serverTimestamp()},{merge:true});
-  }catch(e){}
-  // Refresh every 60s
-  setInterval(()=>{ if(CU) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:true,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){} },60000);
-  // Set offline on page unload
-  window.addEventListener('pagehide',()=>{ if(CU) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:false,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){} });
+  }catch(e){console.warn('setOnline:',e);}
+  // Refresh every 45s to stay alive
+  if(!window._onlineInterval){
+    window._onlineInterval=setInterval(()=>{
+      if(CU&&db&&fs) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:true,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
+    },45000);
+  }
+  // Set offline when tab closes/hides
+  window.addEventListener('pagehide',()=>{
+    if(CU&&db&&fs) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:false,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
+  },{once:true});
+  window.addEventListener('visibilitychange',()=>{
+    if(!CU||!db||!fs) return;
+    if(document.visibilityState==='hidden'){
+      try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:false,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
+    } else {
+      try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:true,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
+    }
+  });
 }
 function watchOnline(uid){
   if(_presenceUnsub){_presenceUnsub();_presenceUnsub=null;}
-  if(!uid) return;
+  const dot=document.getElementById('chat-online-dot');
+  const status=document.getElementById('chat-status');
+  if(dot) dot.style.display='none';
+  if(status){status.textContent='Tap to view profile';status.style.color='';}
+  if(!uid||!db||!fs) return;
   try{
     _presenceUnsub=fs.onSnapshot(fs.doc(db,'presence',uid),snap=>{
-      const dot=document.getElementById('chat-online-dot');
-      const status=document.getElementById('chat-status');
+      const dot2=document.getElementById('chat-online-dot');
+      const status2=document.getElementById('chat-status');
       if(!snap||!snap.exists()){
-        if(dot) dot.style.display='none';
-        if(status) status.textContent='Tap to view profile';
+        if(dot2) dot2.style.display='none';
+        if(status2){status2.textContent='Tap to view profile';status2.style.color='';}
         return;
       }
       const d=snap.data();
       const isOnline=d.online===true;
-      if(dot) dot.style.display=isOnline?'block':'none';
-      if(status){
-        if(isOnline){ status.textContent='🟢 Online'; status.style.color='var(--G)'; }
-        else{
+      if(dot2) dot2.style.display=isOnline?'block':'none';
+      if(status2){
+        if(isOnline){
+          status2.textContent='🟢 Online now';
+          status2.style.color='var(--G)';
+        } else {
           const ls=d.last_seen?.toMillis?d.last_seen.toMillis():null;
-          status.textContent=ls?'Last seen '+fmtTime(ls):'Tap to view profile';
-          status.style.color='';
+          status2.textContent=ls?'Last seen '+fmtTime(ls):'Offline';
+          status2.style.color='var(--muted)';
         }
       }
-    },()=>{});
-  }catch(e){}
+    },err=>{console.warn('watchOnline error:',err);});
+  }catch(e){console.warn('watchOnline:',e);}
 }
 
 // ═══════════════════════════════════════════════════════
