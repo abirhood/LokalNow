@@ -1177,11 +1177,6 @@ function renderFeed(posts){
           <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>
         </button>
       </div>
-             <div style="flex:1;min-width:0;">
-          <div class="post-user">${esc(post.full_name||'User')}${post.verification_level&&post.verification_level!=='none'?' <span style="color:var(--G)">✅</span>':''}${post.is_trusted_local?' <span style="color:var(--gold)">🏆</span>':''}</div>
-          <div class="post-loc">📍 ${esc(post.location_name||post.city||'Local')} · ${fmtTime(post.created_at||post.ts)}${post.privacy==='friends'?' <span class="priv-badge friends">👥 Friends</span>':''}</div>
-        </div>
-      </div>
       ${post.ai_flag?'<div class="ai-warn">⚠️ AI-generated content detected — under review</div>':''}
       <div class="pi-wrap" onclick="openPostLightbox('${post.id}')" style="cursor:pointer;">
         <div class="pi-ph" id="ph-${post.id}">${EMOJI[post.category]||'📸'}</div>
@@ -1672,18 +1667,22 @@ async function sendMsg(){
   const cid=convId(CU.id,_chatUid);
   const ts=fs.serverTimestamp();
   try{
-    await fs.addDoc(fs.collection(db,'convs',cid,'msgs'),{uid:CU.id,text,ts});
-    await fs.setDoc(fs.doc(db,'convs',cid),{
-      members:[CU.id,_chatUid],
-      names:{[CU.id]:CU.full_name,[_chatUid]:_chatName},
-      avatars:{[CU.id]:CU.avatar_url||'',[_chatUid]:_chatAvatar},
-      last:text.substring(0,60),updated_at:ts,last_uid:CU.id,read_by:[CU.id]
-    },{merge:true});
-    await fs.addDoc(fs.collection(db,'notifications'),{
+    // Send message and update conversation in parallel for speed
+    await Promise.all([
+      fs.addDoc(fs.collection(db,'convs',cid,'msgs'),{uid:CU.id,text,ts}),
+      fs.setDoc(fs.doc(db,'convs',cid),{
+        members:[CU.id,_chatUid],
+        names:{[CU.id]:CU.full_name,[_chatUid]:_chatName},
+        avatars:{[CU.id]:CU.avatar_url||'',[_chatUid]:_chatAvatar},
+        last:text.substring(0,60),updated_at:ts,last_uid:CU.id,read_by:[CU.id]
+      },{merge:true})
+    ]);
+    // Notification is non-critical — fire and forget so it never blocks
+    fs.addDoc(fs.collection(db,'notifications'),{
       to_uid:_chatUid,from_uid:CU.id,from_name:CU.full_name,
       from_avatar:CU.avatar_url||'',from_username:CU.username,
       type:'message',text:text.substring(0,60),read:false,created_at:ts
-    });
+    }).catch(()=>{});
   }catch(e){toast('Could not send. Check internet.');inp.value=text;}
 }
 
@@ -2386,9 +2385,14 @@ async function loadUserPosts(uid){
     if(!posts.length){ grid.innerHTML='<div style="grid-column:span 3;text-align:center;padding:24px;color:var(--muted);">No posts yet.</div>'; return; }
     posts.slice(0,12).forEach(p=>{
       const item=document.createElement('div'); item.className='pgi';
-      item.onclick=()=>{if(p.media_url)openLightbox(p.media_url,p.caption);};
-      if(p.media_url){ const img=document.createElement('img'); img.src=p.media_url; img.loading='lazy'; img.onerror=()=>item.textContent=EMOJI[p.category]||'📸'; item.appendChild(img); }
-      else item.textContent=EMOJI[p.category]||'📸';
+      item.onclick=()=>openPostLightboxById(p.id);
+      if(p.media_url){
+        const img=document.createElement('img');
+        img.loading='lazy';
+        img.onerror=()=>item.textContent=EMOJI[p.category]||'📸';
+        item.appendChild(img);
+        resolveMedia(p.media_url).then(src=>{ if(src) img.src=src; else item.textContent=EMOJI[p.category]||'📸'; }).catch(()=>{});
+      } else item.textContent=EMOJI[p.category]||'📸';
       const ov=document.createElement('div'); ov.className='pgo';
       ov.innerHTML='❤️ '+(Array.isArray(p.likes)?p.likes.length:0);
       item.appendChild(ov); grid.appendChild(item);
@@ -2656,9 +2660,13 @@ function openLibModal(){
 
 function onLibPdfFile(e){
   const file=e.target.files[0]; if(!file) return;
-  const maxMB=0.9; // Firestore doc limit ~1MB; keep under 900KB base64 safe
-  if(file.size > maxMB*1024*1024){
-    toast('PDF too large for direct storage (max ~680KB). Please compress it first.');
+  // Firestore doc limit is 1MB. Base64 encoding inflates size by ~33%.
+  // So max raw file = ~680KB to safely stay under 1MB encoded.
+  const maxBytes = 680 * 1024;
+  if(file.size > maxBytes){
+    toast('⚠️ PDF too large (max 680KB). Please compress it at smallpdf.com or ilovepdf.com first.');
+    $('lib-zone-text').textContent='Tap to upload PDF file (max 680KB)';
+    e.target.value='';
     return;
   }
   $('lib-zone-text').textContent='⏳ Reading file...';
@@ -2827,7 +2835,12 @@ function onFeedScroll(el){
 async function openPostLightboxById(postId){
   try{
     const snap=await fs.getDoc(fs.doc(db,'posts',postId));
-    if(snap.exists()){ openLightbox(snap.data().media_url, snap.data().caption, {id:snap.id,...snap.data()}); }
+    if(snap.exists()){
+      const post={id:snap.id,...snap.data()};
+      // Resolve "fs:DOCID" references to actual base64 before showing
+      const src = await resolveMedia(post.media_url);
+      openLightbox(src||post.media_url, post.caption, post);
+    }
   }catch(e){}
 }
 
