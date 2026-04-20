@@ -536,7 +536,7 @@ textarea.inp{resize:none}
       <div class="ps-btn" id="ps-landscape" onclick="applyRatio('1.91:1')"><span class="ratio">🖼</span>Landscape</div>
     </div></div>
     <div class="cf">
-      <textarea class="inp" id="c-cap" placeholder="✍️ Write a caption..." rows="3"></textarea>
+      <textarea class="inp" id="c-cap" placeholder="✍️ Write a caption..." rows="4" enterkeyhint="enter" style="line-height:1.6;"></textarea>
       <div><div class="fl">CATEGORY</div>
         <div class="ctags" id="ctags">
           <div class="ctag" onclick="pickCat(this,'food')">🍜 food</div>
@@ -583,6 +583,9 @@ textarea.inp{resize:none}
     </div>
     <div style="display:flex;gap:9px;padding:13px 12px 6px;">
       <button class="btn" style="flex:1;padding:12px;font-size:14px;" onclick="openEditModal()">✏️ Edit Profile</button>
+      <button class="btn" style="padding:12px 14px;font-size:14px;background:var(--G2);" onclick="shareProfile(CU?.id)" title="Share my profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </button>
       <button class="btn btn-red" style="flex:1;padding:12px;font-size:14px;" onclick="doLogout()">Sign Out</button>
     </div>
     <div class="about-block" id="about-block" style="display:block;cursor:pointer;" onclick="openEditModal()">
@@ -647,7 +650,9 @@ textarea.inp{resize:none}
       <svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
     </button>
     <div class="topbar-title" id="up-handle">Profile</div>
-    <div style="width:44px;"></div>
+    <button class="ib" onclick="shareProfile(_viewingUserId)" title="Share profile">
+      <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
   </div>
   <div class="scroll">
     <div class="prh">
@@ -899,11 +904,11 @@ textarea.inp{resize:none}
       <div class="ctag" onclick="pickLibCat(this,'science')">🔬 Science</div>
       <div class="ctag" onclick="pickLibCat(this,'religion')">🕌 Religion</div>
     </div>
-    <div class="bk-zone" id="lib-zone" onclick="document.getElementById('fi-lib-pdf').click()">
+    <div class="bk-zone" id="lib-zone" onclick="triggerLibPdf()">
       <div style="font-size:28px;margin-bottom:6px;">📄</div>
-      <div style="font-size:13px;color:var(--muted);" id="lib-zone-text">Tap to upload PDF file</div>
+      <div style="font-size:14px;color:var(--G);font-weight:600;" id="lib-zone-text">Tap to choose PDF from gallery</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Max 680KB · PDF files only</div>
     </div>
-    <input type="file" id="fi-lib-pdf" accept="application/pdf,.pdf" style="display:none" onchange="onLibPdfFile(event)"/>
     <div class="prog" id="lib-prog" style="margin:0 0 8px;"><div class="prog-f" id="lib-prog-f"></div></div>
     <button class="btn" id="lib-submit-btn" onclick="submitLibBook()">Add to Library →</button>
   </div>
@@ -912,6 +917,7 @@ textarea.inp{resize:none}
 <input type="file" id="fi-post"   accept="image/*" style="display:none" onchange="onPostPhoto(event)"/>
 <input type="file" id="fi-avatar" accept="image/*" style="display:none" onchange="onAvatarPhoto(event)"/>
 <input type="file" id="fi-regav"  accept="image/*" style="display:none" onchange="onRegAvatarPhoto(event)"/>
+<input type="file" id="fi-lib-pdf" accept="application/pdf,.pdf,.PDF" style="display:none;position:fixed;top:-9999px;left:-9999px;" onchange="onLibPdfFile(event)"/>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1111,13 +1117,16 @@ function launchApp(){
   getLocation();showPage('pg-feed');
   // Check for pending deep link after login
   const pendingPost = sessionStorage.getItem('pending_post');
+  const pendingUser = sessionStorage.getItem('pending_user');
   if(pendingPost){ sessionStorage.removeItem('pending_post'); setTimeout(()=>scrollToPost(pendingPost),1500); }
+  else if(pendingUser){ sessionStorage.removeItem('pending_user'); setTimeout(()=>viewUserProfile(pendingUser),1500); }
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   const nb=$('nb-feed');if(nb)nb.classList.add('on');
   history.replaceState({page:'pg-feed'},'');history.pushState({page:'pg-feed'},'');
   loadFeed();
   // Check for unread notifications after 2s (show red dot)
   setTimeout(checkUnreadNotifs,2000);setTimeout(checkFriendRequests,3000);setTimeout(checkUnreadDMs,2500);setTimeout(setOnline,1000);
+  setTimeout(syncFriendships,1500); // sync friend list from Firestore
 }
 
 // ── LOCATION ──────────────────────────────────────────────
@@ -1197,7 +1206,7 @@ function renderFeed(posts){
         </button>
         ${post.latitude?`<button class="go-btn" onclick="openMaps(${post.latitude},${post.longitude})"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="width:13px;height:13px;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>Go There</button>`:''}
       </div>
-      ${post.caption?`<div class="cap"><b>${esc(post.username||'user')}</b> ${esc(post.caption)}</div>`:''}
+      ${post.caption?`<div class="cap">${esc(post.caption)}</div>`:''}
       <div class="cmts" id="cm-${post.id}">
         <div class="cmt-list" id="cml-${post.id}"></div>
         <div class="cmt-row">
@@ -1300,6 +1309,18 @@ function sharePost(postId){
     navigator.share({title:'Check out this post on LokalNow!', url}).catch(()=>{});
   } else if(navigator.clipboard){
     navigator.clipboard.writeText(url).then(()=>toast('📋 Post link copied!'),()=>toast('Link: '+url));
+  } else {
+    prompt('Copy this link:', url);
+  }
+}
+
+function shareProfile(uid){
+  const base = (location.origin + location.pathname).replace(/\/+$/,'');
+  const url  = base + '?user=' + encodeURIComponent(uid||CU?.id||'');
+  if(navigator.share){
+    navigator.share({title:'View profile on LokalNow', url}).catch(()=>{});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(()=>toast('📋 Profile link copied!'),()=>toast('Link: '+url));
   } else {
     prompt('Copy this link:', url);
   }
@@ -1420,7 +1441,7 @@ async function loadProfile(){
       card.className='post';card.style.margin='0 0 2px';card.style.borderRadius='0';
       card.dataset.pid=p.id;
       var lh='';
-      if(p.caption) lh='<div class="cap" style="padding:2px 13px 8px;"><b>'+esc(p.username||'user')+'</b> '+esc(p.caption)+'</div>';
+      if(p.caption) lh='<div class="cap" style="padding:2px 13px 8px;">'+esc(p.caption)+'</div>';
       var lk=liked?' liked':'';
       var lf=liked?' fill="var(--red)"':'';
       card.innerHTML='<div class="ph">'
@@ -1758,11 +1779,35 @@ function saveFriendUIDs(arr){
 }
 
 // Check if a post should be visible to current user
+// friends-only posts are STRICTLY hidden from non-friends
 function canSeePost(post){
   if(!post.privacy || post.privacy === 'public') return true;
-  if(!CU) return false;
-  if(post.uid === CU.id) return true;
-  return getFriendUIDs().includes(post.uid);
+  if(post.privacy === 'friends'){
+    if(!CU) return false;                          // not logged in
+    if(post.uid === CU.id) return true;            // own post always visible
+    return getFriendUIDs().includes(post.uid);     // must be friends
+  }
+  return true; // any unknown privacy value → show
+}
+
+// On login, sync friendship list from Firestore so it's always accurate
+async function syncFriendships(){
+  if(!CU||!db||!fs) return;
+  try{
+    const snap = await fs.getDocs(fs.query(
+      fs.collection(db,'friendships'),
+      fs.where('members','array-contains',CU.id)
+    ));
+    const uids = [];
+    snap.docs.forEach(d=>{
+      const m = d.data().members||[];
+      m.forEach(id=>{ if(id!==CU.id && !uids.includes(id)) uids.push(id); });
+    });
+    saveFriendUIDs(uids);
+    // Update friend count display
+    const spf = document.getElementById('sp-friends');
+    if(spf) spf.textContent = fmtN(uids.length);
+  }catch(e){ console.warn('syncFriendships:',e); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2128,7 +2173,7 @@ function showPostModal(post){
     </div>
     ${post.media_url?`<img src="${post.media_url}" style="width:100%;max-height:60vw;object-fit:cover;" alt="post"/>`:
       `<div style="width:100%;height:200px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:56px;">${EMOJI[post.category]||'📸'}</div>`}
-    ${post.caption?`<div style="padding:10px 14px;font-size:14px;line-height:1.5;"><b>${esc(post.username||'user')}</b> ${esc(post.caption)}</div>`:''}
+    ${post.caption?`<div style="padding:10px 14px;font-size:14px;line-height:1.5;">${esc(post.caption)}</div>`:''}
     <div style="display:flex;align-items:center;padding:6px 10px;gap:4px;">
       <button class="ab ${liked?'liked':''}" onclick="toggleLike('${post.id}',${liked})">
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="${liked?'var(--red)':'none'}"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -2146,14 +2191,17 @@ function boot(){
   db=window._db;fs=window._fs;
   try{const sess=localStorage.getItem('ln_sess');if(sess){CU=JSON.parse(sess);if(CU)window._currentUID=CU.id}}catch(e){}
   const linked=new URLSearchParams(window.location.search).get('post');
+  const linkedUser=new URLSearchParams(window.location.search).get('user');
   setTimeout(()=>{
     if(CU){
       launchApp();
       if(linked) setTimeout(()=>scrollToPost(decodeURIComponent(linked)),1600);
+      else if(linkedUser) setTimeout(()=>viewUserProfile(decodeURIComponent(linkedUser)),1600);
     } else {
       showPage('pg-login');
       history.replaceState({page:'pg-login'},'');
       if(linked) sessionStorage.setItem('pending_post',decodeURIComponent(linked));
+      else if(linkedUser) sessionStorage.setItem('pending_user',decodeURIComponent(linkedUser));
     }
   },2400);
 }
@@ -2650,12 +2698,20 @@ function pickLibCat(el, cat){
 function openLibModal(){
   if(!CU){ toast('Sign in to add books'); return; }
   $('lib-title').value='';$('lib-author').value='';$('lib-pub').value='';$('lib-year').value='';$('lib-desc').value='';
-  $('lib-zone-text').textContent='Tap to upload PDF file';
+  $('lib-zone-text').textContent='Tap to choose PDF from gallery';
+  $('lib-zone').style.borderColor='';
   $('lib-zone').classList.remove('has-file');
   _libPdfData=null; _libChosenCat=null;
   document.querySelectorAll('#lib-cats .ctag').forEach(c=>c.classList.remove('on'));
   $('lib-prog').style.display='none';
   openModal('lib-modal');
+}
+
+function triggerLibPdf(){
+  // Reset value so same file can be re-selected, then trigger
+  const inp = document.getElementById('fi-lib-pdf');
+  inp.value = '';
+  setTimeout(()=>inp.click(), 50); // small delay needed on some Android browsers
 }
 
 function onLibPdfFile(e){
@@ -2665,18 +2721,19 @@ function onLibPdfFile(e){
   const maxBytes = 680 * 1024;
   if(file.size > maxBytes){
     toast('⚠️ PDF too large (max 680KB). Please compress it at smallpdf.com or ilovepdf.com first.');
-    $('lib-zone-text').textContent='Tap to upload PDF file (max 680KB)';
+    $('lib-zone-text').textContent='Tap to choose PDF from gallery (max 680KB)';
     e.target.value='';
     return;
   }
   $('lib-zone-text').textContent='⏳ Reading file...';
+  $('lib-zone').style.borderColor='var(--G)';
   const r=new FileReader();
   r.onload=ev=>{
     _libPdfData={base64:ev.target.result, name:file.name, size:file.size};
     $('lib-zone').classList.add('has-file');
     $('lib-zone-text').textContent='✅ '+file.name+' ('+Math.round(file.size/1024)+'KB ready)';
   };
-  r.onerror=()=>{ toast('Could not read PDF file.'); $('lib-zone-text').textContent='Tap to upload PDF file'; };
+  r.onerror=()=>{ toast('Could not read PDF file.'); $('lib-zone-text').textContent='Tap to choose PDF from gallery'; $('lib-zone').style.borderColor=''; };
   r.readAsDataURL(file);
 }
 
