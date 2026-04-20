@@ -536,7 +536,7 @@ textarea.inp{resize:none}
       <div class="ps-btn" id="ps-landscape" onclick="applyRatio('1.91:1')"><span class="ratio">🖼</span>Landscape</div>
     </div></div>
     <div class="cf">
-      <textarea class="inp" id="c-cap" placeholder="✍️ Write a caption..." rows="4" enterkeyhint="enter" style="line-height:1.6;"></textarea>
+      <textarea class="inp" id="c-cap" placeholder="✍️ Write a caption..." rows="4" enterkeyhint="enter" inputmode="text" style="line-height:1.6;" onkeydown="event.stopPropagation()"></textarea>
       <div><div class="fl">CATEGORY</div>
         <div class="ctags" id="ctags">
           <div class="ctag" onclick="pickCat(this,'food')">🍜 food</div>
@@ -904,11 +904,12 @@ textarea.inp{resize:none}
       <div class="ctag" onclick="pickLibCat(this,'science')">🔬 Science</div>
       <div class="ctag" onclick="pickLibCat(this,'religion')">🕌 Religion</div>
     </div>
-    <div class="bk-zone" id="lib-zone" onclick="triggerLibPdf()">
-      <div style="font-size:28px;margin-bottom:6px;">📄</div>
-      <div style="font-size:14px;color:var(--G);font-weight:600;" id="lib-zone-text">Tap to choose PDF from gallery</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Max 680KB · PDF files only</div>
-    </div>
+    <label for="fi-lib-pdf" class="bk-zone" id="lib-zone" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="font-size:32px;margin-bottom:8px;">📄</div>
+      <div style="font-size:14px;color:var(--G);font-weight:700;" id="lib-zone-text">Tap to choose PDF file</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Max 30MB · PDF files only</div>
+    </label>
+    <input type="file" id="fi-lib-pdf" accept="application/pdf" style="display:none" onchange="onLibPdfFile(event)"/>
     <div class="prog" id="lib-prog" style="margin:0 0 8px;"><div class="prog-f" id="lib-prog-f"></div></div>
     <button class="btn" id="lib-submit-btn" onclick="submitLibBook()">Add to Library →</button>
   </div>
@@ -917,7 +918,6 @@ textarea.inp{resize:none}
 <input type="file" id="fi-post"   accept="image/*" style="display:none" onchange="onPostPhoto(event)"/>
 <input type="file" id="fi-avatar" accept="image/*" style="display:none" onchange="onAvatarPhoto(event)"/>
 <input type="file" id="fi-regav"  accept="image/*" style="display:none" onchange="onRegAvatarPhoto(event)"/>
-<input type="file" id="fi-lib-pdf" accept="application/pdf,.pdf,.PDF" style="display:none;position:fixed;top:-9999px;left:-9999px;" onchange="onLibPdfFile(event)"/>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1306,11 +1306,13 @@ function sharePost(postId){
   const base = (location.origin + location.pathname).replace(/\/+$/,'');
   const url  = base + '?post=' + encodeURIComponent(postId);
   if(navigator.share){
-    navigator.share({title:'Check out this post on LokalNow!', url}).catch(()=>{});
-  } else if(navigator.clipboard){
-    navigator.clipboard.writeText(url).then(()=>toast('📋 Post link copied!'),()=>toast('Link: '+url));
+    navigator.share({title:'Check out this post on LokalNow!', url})
+      .catch(()=>{ navigator.clipboard?.writeText(url); toast('📋 Link copied: '+url.slice(-20)+'…'); });
   } else {
-    prompt('Copy this link:', url);
+    navigator.clipboard?.writeText(url).then(
+      ()=>toast('📋 Post link copied to clipboard!'),
+      ()=>prompt('Copy this post link:',url)
+    );
   }
 }
 
@@ -1318,11 +1320,13 @@ function shareProfile(uid){
   const base = (location.origin + location.pathname).replace(/\/+$/,'');
   const url  = base + '?user=' + encodeURIComponent(uid||CU?.id||'');
   if(navigator.share){
-    navigator.share({title:'View profile on LokalNow', url}).catch(()=>{});
-  } else if(navigator.clipboard){
-    navigator.clipboard.writeText(url).then(()=>toast('📋 Profile link copied!'),()=>toast('Link: '+url));
+    navigator.share({title:'View profile on LokalNow', url})
+      .catch(()=>{ navigator.clipboard?.writeText(url); toast('📋 Link copied!'); });
   } else {
-    prompt('Copy this link:', url);
+    navigator.clipboard?.writeText(url).then(
+      ()=>toast('📋 Profile link copied to clipboard!'),
+      ()=>prompt('Copy this profile link:',url)
+    );
   }
 }
 function openMaps(lat,lng){window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank')}
@@ -1557,6 +1561,10 @@ function openLightbox(url,cap){
   $('lightbox').classList.add('on');
   history.pushState({page:_currentPage,modal:'lb'},'');
 }
+function openImgLightbox(url){
+  // Used for chat photos — reuse the same lightbox
+  openLightbox(url,'');
+}
 function closeLightbox(){$('lightbox').classList.remove('on');}
 
 // ═══════════════════════════════════════════════════════
@@ -1628,20 +1636,21 @@ function loadMsgs(){
   wrap.innerHTML='<div class="day-div">Loading...</div>';
   if(_chatUnsub){_chatUnsub();_chatUnsub=null;}
   try{
-    const q=fs.query(fs.collection(db,'convs',cid,'msgs'),fs.limit(100));
+    // No orderBy → no Firestore index needed. Fetch 200, sort in JS.
+    const q=fs.query(fs.collection(db,'convs',cid,'msgs'),fs.limit(200));
     _chatUnsub=fs.onSnapshot(q,snap=>{
       wrap.innerHTML='';
       if(snap.empty){wrap.innerHTML='<div class="day-div">Say hello 👋</div>';return;}
-      // Sort by timestamp in JS — no Firestore index needed
       const msgs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      // Sort oldest→newest by ts
       msgs.sort((a,b)=>{
-        const ta=a.ts?.toMillis?a.ts.toMillis():(a.ts||0);
-        const tb=b.ts?.toMillis?b.ts.toMillis():(b.ts||0);
+        const ta=a.ts?.toMillis?a.ts.toMillis():(typeof a.ts==='number'?a.ts:0);
+        const tb=b.ts?.toMillis?b.ts.toMillis():(typeof b.ts==='number'?b.ts:0);
         return ta-tb;
       });
       let lastDay='';
       msgs.forEach(m=>{
-        const rawTs=m.ts?.toMillis?m.ts.toMillis():(typeof m.ts==='number'?m.ts:Date.now());
+        const rawTs=m.ts?.toMillis?m.ts.toMillis():(typeof m.ts==='number'?m.ts:null);
         const ts=rawTs||Date.now();
         const day=new Date(ts).toLocaleDateString();
         if(day!==lastDay){
@@ -1653,7 +1662,6 @@ function loadMsgs(){
         const row=document.createElement('div');row.className='msg-row '+(mine?'mine':'other');
         const timeStr=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
         if(m.img_url){
-          // Build image bubble using DOM to avoid huge src in innerHTML
           const bubble=document.createElement('div');
           bubble.className='bubble';
           bubble.style.cssText='padding:4px;background:transparent;';
@@ -1676,8 +1684,8 @@ function loadMsgs(){
         wrap.appendChild(row);
       });
       wrap.scrollTop=wrap.scrollHeight;
-    },e=>{wrap.innerHTML='<div class="day-div">Could not load messages.</div>';});
-  }catch(e){wrap.innerHTML='<div class="day-div">Error loading chat.</div>';}
+    },e=>{wrap.innerHTML='<div class="day-div">Could not load messages.</div>';console.warn('loadMsgs:',e);});
+  }catch(e){wrap.innerHTML='<div class="day-div">Error loading chat.</div>';console.error('loadMsgs:',e);}
 }
 
 async function sendMsg(){
@@ -2708,24 +2716,20 @@ function openLibModal(){
 }
 
 function triggerLibPdf(){
-  // Reset value so same file can be re-selected, then trigger
-  const inp = document.getElementById('fi-lib-pdf');
-  inp.value = '';
-  setTimeout(()=>inp.click(), 50); // small delay needed on some Android browsers
+  // Kept for compatibility but label now handles this
+  document.getElementById('fi-lib-pdf').click();
 }
 
 function onLibPdfFile(e){
   const file=e.target.files[0]; if(!file) return;
-  // Firestore doc limit is 1MB. Base64 encoding inflates size by ~33%.
-  // So max raw file = ~680KB to safely stay under 1MB encoded.
-  const maxBytes = 680 * 1024;
+  const maxBytes = 30 * 1024 * 1024; // 30MB
   if(file.size > maxBytes){
-    toast('⚠️ PDF too large (max 680KB). Please compress it at smallpdf.com or ilovepdf.com first.');
-    $('lib-zone-text').textContent='Tap to choose PDF from gallery (max 680KB)';
+    toast('⚠️ PDF too large. Maximum size is 30MB.');
+    $('lib-zone-text').textContent='Tap to choose PDF file';
     e.target.value='';
     return;
   }
-  $('lib-zone-text').textContent='⏳ Reading file...';
+  $('lib-zone-text').textContent='⏳ Reading file... ('+Math.round(file.size/1024/1024*10)/10+'MB)';
   $('lib-zone').style.borderColor='var(--G)';
   const r=new FileReader();
   r.onload=ev=>{
@@ -2733,7 +2737,7 @@ function onLibPdfFile(e){
     $('lib-zone').classList.add('has-file');
     $('lib-zone-text').textContent='✅ '+file.name+' ('+Math.round(file.size/1024)+'KB ready)';
   };
-  r.onerror=()=>{ toast('Could not read PDF file.'); $('lib-zone-text').textContent='Tap to choose PDF from gallery'; $('lib-zone').style.borderColor=''; };
+  r.onerror=()=>{ toast('Could not read PDF file.'); $('lib-zone-text').textContent='Tap to choose PDF file'; $('lib-zone').style.borderColor=''; };
   r.readAsDataURL(file);
 }
 
@@ -2746,18 +2750,31 @@ async function submitLibBook(){
   const btn=$('lib-submit-btn');
   btn.innerHTML='<span class="spin"></span> Uploading...'; btn.disabled=true;
   const prog=$('lib-prog'), fill=$('lib-prog-f');
-  prog.style.display='block'; fill.style.width='20%';
+  prog.style.display='block'; fill.style.width='5%';
   try{
-    // Store PDF base64 in Firestore (split if needed)
-    fill.style.width='50%';
-    const docRef=await fs.addDoc(fs.collection(db,'library'),{
+    // Split base64 into 700KB chunks to stay under Firestore 1MB doc limit
+    const CHUNK = 700 * 1024; // 700KB per chunk (base64 chars)
+    const b64 = _libPdfData.base64;
+    const totalChunks = Math.ceil(b64.length / CHUNK);
+    const chunks = [];
+    for(let i=0;i<totalChunks;i++) chunks.push(b64.slice(i*CHUNK,(i+1)*CHUNK));
+
+    // Create the main library doc first (without pdf_data)
+    const docRef = await fs.addDoc(fs.collection(db,'library'),{
       title, author_name:author, publisher:pub||'', year:year||'',
       description:desc, category:_libChosenCat||'fiction',
-      pdf_data:_libPdfData.base64, pdf_name:_libPdfData.name,
-      pdf_size:_libPdfData.size, uid:CU.id,
-      uploader_name:CU.full_name, uploader_username:CU.username,
+      pdf_name:_libPdfData.name, pdf_size:_libPdfData.size,
+      pdf_chunks: totalChunks, // how many chunk docs to load
+      uid:CU.id, uploader_name:CU.full_name, uploader_username:CU.username,
       created_at:fs.serverTimestamp()
     });
+
+    // Store each chunk as a subcollection doc
+    for(let i=0;i<chunks.length;i++){
+      await fs.setDoc(fs.doc(db,'library',docRef.id,'chunks','chunk_'+i),{data:chunks[i],index:i});
+      fill.style.width = Math.round(10 + (i+1)/chunks.length*88) + '%';
+    }
+
     fill.style.width='100%';
     setTimeout(()=>{ prog.style.display='none'; fill.style.width='0%'; },500);
     btn.textContent='Add to Library →'; btn.disabled=false;
@@ -2799,15 +2816,15 @@ async function loadLibrary(){
       const card=document.createElement('div');
       card.className='bc';
       card.onclick=()=>openPDFReader(b);
-      card.innerHTML=`<div class="bcv" style="background:\${col||'#e8f5ee'};flex-direction:column;gap:4px;">
-        <div style="font-size:32px;">\${LIB_EMOJI[b.category]||'📖'}</div>
-        <div style="font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,.3);padding:2px 7px;border-radius:4px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${esc(b.category||'book').toUpperCase()}</div>
+      card.innerHTML=`<div class="bcv" style="background:${col||'#e8f5ee'};flex-direction:column;gap:4px;">
+        <div style="font-size:32px;">${LIB_EMOJI[b.category]||'📖'}</div>
+        <div style="font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,.3);padding:2px 7px;border-radius:4px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(b.category||'book').toUpperCase()}</div>
       </div>
       <div class="bi">
-        <div class="bt">\${esc(b.title)}</div>
-        <div class="ba" style="margin-top:2px;">✍️ \${esc(b.author_name)}</div>
-        \${b.publisher?'<div class="ba">🏢 '+esc(b.publisher)+'</div>':''}
-        \${b.year?'<div class="ba">📅 '+esc(b.year)+'</div>':''}
+        <div class="bt">${esc(b.title)}</div>
+        <div class="ba" style="margin-top:2px;">✍️ ${esc(b.author_name)}</div>
+        ${b.publisher?'<div class="ba">🏢 '+esc(b.publisher)+'</div>':''}
+        ${b.year?'<div class="ba">📅 '+esc(b.year)+'</div>':''}
         <div style="margin-top:5px;font-size:11px;color:var(--G);font-weight:700;">📄 PDF · Free</div>
       </div>`;
       wrapper.appendChild(card);
@@ -2819,28 +2836,63 @@ async function loadLibrary(){
   }
 }
 
-function openPDFReader(book){
+async function openPDFReader(book){
   $('pdf-reader-title').textContent=book.title||'Book';
   const body=$('pdf-reader-body');
-  body.innerHTML='<p style="color:#fff;text-align:center;padding:40px 16px;">Loading PDF...</p>';
-  // Set download link
+  body.innerHTML='<p style="color:#fff;text-align:center;padding:40px 16px;">⏳ Loading PDF...</p>';
   const dl=$('pdf-download-link');
-  if(book.pdf_data){ dl.href=book.pdf_data; dl.download=book.pdf_name||'book.pdf'; dl.style.display='flex'; }
-  else { dl.style.display='none'; }
+  dl.style.display='none';
   navTo('pg-pdfreader');
-  if(book.pdf_data){
-    // Embed PDF using an iframe with the base64 data
+
+  try{
+    let fullB64='';
+    if(book.pdf_chunks && book.pdf_chunks>0){
+      // Reassemble from chunks subcollection
+      const chunkDocs=[];
+      for(let i=0;i<book.pdf_chunks;i++){
+        const snap=await fs.getDoc(fs.doc(db,'library',book.id,'chunks','chunk_'+i));
+        if(snap.exists()) chunkDocs.push({index:i,data:snap.data().data});
+      }
+      chunkDocs.sort((a,b)=>a.index-b.index);
+      fullB64=chunkDocs.map(c=>c.data).join('');
+    } else if(book.pdf_data){
+      fullB64=book.pdf_data;
+    }
+
+    if(!fullB64){
+      body.innerHTML='<div style="padding:20px;color:#fff;text-align:center;"><p>No PDF content found.</p><p style="font-size:12px;opacity:.6;margin-top:8px;">'+esc(book.description||'')+'</p></div>';
+      return;
+    }
+
+    // Convert base64 to Blob → object URL (works on mobile, no iframe sandbox issues)
+    const byteChars=atob(fullB64.split(',')[1]||fullB64);
+    const byteArr=new Uint8Array(byteChars.length);
+    for(let i=0;i<byteChars.length;i++) byteArr[i]=byteChars.charCodeAt(i);
+    const blob=new Blob([byteArr],{type:'application/pdf'});
+    const objUrl=URL.createObjectURL(blob);
+
+    // Download button
+    dl.href=objUrl; dl.download=book.pdf_name||book.title+'.pdf'; dl.style.display='flex';
+
+    // Render
+    body.innerHTML='';
+    body.style.overflow='hidden'; body.style.padding='0';
+    const iframe=document.createElement('iframe');
+    iframe.style.cssText='width:100%;height:100%;border:none;display:block;background:#fff;';
+    iframe.src=objUrl;
+    body.appendChild(iframe);
+
+    // Fallback message in case iframe blocks PDF (some mobile browsers)
     setTimeout(()=>{
-      body.innerHTML='';
-      const iframe=document.createElement('iframe');
-      iframe.style.cssText='width:100%;height:100%;border:none;display:block;';
-      iframe.src=book.pdf_data;
-      body.style.overflow='hidden';
-      body.style.padding='0';
-      body.appendChild(iframe);
-    },100);
-  } else {
-    body.innerHTML='<div style="padding:20px;color:#fff;"><h2 style="margin-bottom:10px;">'+esc(book.title)+'</h2><p>'+esc(book.description||'No content.')+'</p></div>';
+      const msg=document.createElement('div');
+      msg.style.cssText='position:absolute;bottom:60px;left:0;right:0;text-align:center;';
+      msg.innerHTML='<a href="'+objUrl+'" download="'+(book.pdf_name||'book.pdf')+'" style="background:var(--G);color:#fff;padding:10px 20px;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none;">⬇ Download PDF</a>';
+      body.style.position='relative';
+      body.appendChild(msg);
+    },1000);
+  }catch(e){
+    body.innerHTML='<div style="padding:20px;color:#fff;text-align:center;"><p>❌ Could not load PDF.<br>Try downloading it instead.</p></div>';
+    console.error('openPDFReader:',e);
   }
 }
 
@@ -2919,7 +2971,9 @@ function openPostLightbox(postId){
 // CHAT PHOTO SENDING
 // ═══════════════════════════════════════════════════════
 function pickChatPhoto(){
-  document.getElementById('fi-chat-photo').click();
+  const inp=document.getElementById('fi-chat-photo');
+  inp.value='';
+  inp.click();
 }
 async function onChatPhoto(e){
   const file=e.target.files[0]; if(!file) return;
@@ -2927,19 +2981,20 @@ async function onChatPhoto(e){
   if(!CU||!_chatUid){ toast('Open a chat first'); return; }
   toast('⏳ Sending photo...');
   try{
-    // Resize to max 800px for messages
     const b64=await imgToBase64(file,800,0.85);
     const cid=convId(CU.id,_chatUid);
     const ts=fs.serverTimestamp();
-    await fs.addDoc(fs.collection(db,'convs',cid,'msgs'),{uid:CU.id,img_url:b64,text:'',ts});
-    await fs.setDoc(fs.doc(db,'convs',cid),{
-      members:[CU.id,_chatUid],
-      names:{[CU.id]:CU.full_name,[_chatUid]:_chatName},
-      avatars:{[CU.id]:CU.avatar_url||'',[_chatUid]:_chatAvatar},
-      last:'📷 Photo',updated_at:ts,last_uid:CU.id,read_by:[CU.id]
-    },{merge:true});
+    await Promise.all([
+      fs.addDoc(fs.collection(db,'convs',cid,'msgs'),{uid:CU.id,img_url:b64,text:'',ts}),
+      fs.setDoc(fs.doc(db,'convs',cid),{
+        members:[CU.id,_chatUid],
+        names:{[CU.id]:CU.full_name,[_chatUid]:_chatName},
+        avatars:{[CU.id]:CU.avatar_url||'',[_chatUid]:_chatAvatar},
+        last:'📷 Photo',updated_at:ts,last_uid:CU.id,read_by:[CU.id]
+      },{merge:true})
+    ]);
     toast('✅ Photo sent!');
-  }catch(e){ toast('❌ Could not send photo: '+e.message); }
+  }catch(e){ toast('❌ Could not send photo: '+e.message); console.error('onChatPhoto:',e); }
 }
 
 // ═══════════════════════════════════════════════════════
