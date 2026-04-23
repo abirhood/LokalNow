@@ -381,9 +381,6 @@ textarea.inp{resize:none}
 .reader-body h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:16px;color:var(--G2)}
 .reader-body h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin:20px 0 10px;color:var(--G2)}
 .reader-body p{margin-bottom:14px}
-/* Book upload zone */
-.bk-zone{border:2.5px dashed var(--border);border-radius:14px;padding:24px 16px;text-align:center;cursor:pointer;background:#fff;transition:all .2s;margin-bottom:12px}
-.bk-zone:active,.bk-zone.has-file{border-style:solid;border-color:var(--G);background:#f5fbf7}
 /* Lightbox */
 .lb-bg{position:fixed;inset:0;background:rgba(0,0,0,.95);display:none;align-items:center;justify-content:center;z-index:500}
 .lb-bg.on{display:flex}
@@ -407,6 +404,25 @@ textarea.inp{resize:none}
 .priv-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;margin-left:5px;}
 .priv-badge.friends{background:#e8f5ee;color:var(--G);}
 .priv-badge.public{background:#f0f4f1;color:var(--muted);}
+
+/* Communities */
+.comm-card{background:#fff;border-radius:16px;margin:8px 12px;box-shadow:var(--shadow);overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .15s;}
+.comm-card:active{transform:scale(.98);}
+.comm-banner-strip{height:70px;display:flex;align-items:center;padding:0 16px;gap:12px;}
+.comm-icon-big{font-size:32px;flex-shrink:0;}
+.comm-card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--G2);}
+.comm-card-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.comm-card-desc{padding:0 14px 12px;font-size:13px;color:#4a5e50;line-height:1.5;}
+.comm-card-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);}
+.comm-join-pill{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent;}
+.comm-join-pill.join{background:var(--G);color:#fff;}
+.comm-join-pill.joined{background:var(--bg);color:var(--muted);border:1.5px solid var(--border);}
+/* Community post */
+.comm-post{background:#fff;margin:6px 10px;border-radius:14px;box-shadow:var(--shadow);overflow:hidden;}
+.comm-post-header{display:flex;align-items:center;gap:10px;padding:11px 12px 6px;}
+.comm-post-body{padding:4px 12px 10px;font-size:14px;line-height:1.55;color:#1a2e24;}
+.comm-post-img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;}
+.comm-post-actions{display:flex;align-items:center;padding:4px 8px 8px;gap:2px;border-top:1px solid var(--border);}
 </style>
 </head>
 <body>
@@ -455,7 +471,6 @@ textarea.inp{resize:none}
       <div class="fl" style="margin-top:2px;">ABOUT ME (optional)</div>
       <textarea class="inp" id="r-about" placeholder="Tell your community about yourself... (max 200 words)" rows="3" oninput="countWords(this,'r-ac',200)"></textarea>
       <div class="char-c" id="r-ac">0 / 200 words</div>
-      <div class="note">🔐 Your data is stored only in your own Firebase project.</div>
       <button class="btn" id="r-btn" onclick="doRegister()">Create Account →</button>
       <div class="link-row" onclick="navTo('pg-login')">Already registered? <b>Sign in</b></div>
     </div>
@@ -597,19 +612,6 @@ textarea.inp{resize:none}
     <div class="sec-title">My Posts</div>
     <div id="pgrid" style="display:flex;flex-direction:column;gap:0;padding-bottom:20px;"></div>
   </div>
-</div>
-
-<!-- EBOOKS -->
-<div class="page" id="pg-ebooks" style="flex-direction:column;">
-  <div class="bkh"><div class="bkt">📚 E-Books</div>
-    <div class="chips" id="bk-chips" style="padding:10px 0 0;">
-      <div class="chip on" onclick="setBkFilter(this,'all')">📚 All</div>
-      <div class="chip" onclick="setBkFilter(this,'free')">🆓 Free</div>
-      <div class="chip" onclick="setBkFilter(this,'local')">📍 Local</div>
-    </div>
-  </div>
-  <div class="scroll"><div class="bg" id="bk-grid"></div></div>
-  <button class="fab" onclick="openBookModal()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="width:17px;height:17px;"><path d="M12 5v14M5 12h14"/></svg>Publish a Book</button>
 </div>
 
 <!-- ══ SEARCH ══ -->
@@ -760,37 +762,48 @@ textarea.inp{resize:none}
   </div>
 </div>
 
-<!-- ══ LIBRARY (PDF Books) ══ -->
-<div class="page" id="pg-library" style="flex-direction:column;">
+<!-- ══ COMMUNITIES (Facebook-style Groups) ══ -->
+<div class="page" id="pg-communities" style="flex-direction:column;">
   <div class="topbar">
-    <div class="logo" style="font-size:18px;">📚 Library</div>
-    <button class="ib" onclick="openLibModal()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <div class="logo" style="font-size:19px;">🏘 Communities</div>
+    <button class="ib" onclick="openCreateCommunityModal()">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
   </div>
-  <div class="chips" id="lib-chips" style="flex-shrink:0;">
-    <div class="chip on" onclick="setLibFilter(this,'all')">📚 All</div>
-    <div class="chip" onclick="setLibFilter(this,'fiction')">📖 Fiction</div>
-    <div class="chip" onclick="setLibFilter(this,'history')">🏛 History</div>
-    <div class="chip" onclick="setLibFilter(this,'tech')">💻 Tech</div>
-    <div class="chip" onclick="setLibFilter(this,'art')">🎨 Art</div>
-    <div class="chip" onclick="setLibFilter(this,'local')">📍 Local</div>
-    <div class="chip" onclick="setLibFilter(this,'science')">🔬 Science</div>
-    <div class="chip" onclick="setLibFilter(this,'religion')">🕌 Religion</div>
+  <div class="chips" id="comm-chips" style="flex-shrink:0;">
+    <div class="chip on" onclick="setCommTab(this,'discover')">🔍 Discover</div>
+    <div class="chip" onclick="setCommTab(this,'mine')">👤 My Groups</div>
   </div>
-  <div class="scroll" id="lib-grid">
-    <div class="empty"><div class="ei">⏳</div><p>Loading library...</p></div>
+  <div class="scroll" id="comm-list">
+    <div class="empty"><div class="ei">⏳</div><p>Loading communities...</p></div>
   </div>
 </div>
 
-<!-- ══ PDF READER PAGE ══ -->
-<div class="page" id="pg-pdfreader" style="flex-direction:column;">
-  <div class="reader-head">
-    <button class="ib" onclick="history.back()" style="color:#fff;padding:6px;"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
-    <h3 id="pdf-reader-title">Book</h3>
-    <a id="pdf-download-link" href="#" download style="color:#fff;font-size:12px;font-weight:700;text-decoration:none;padding:6px 10px;background:rgba(255,255,255,.15);border-radius:8px;flex-shrink:0;">⬇ PDF</a>
+<!-- ══ COMMUNITY DETAIL PAGE ══ -->
+<div class="page" id="pg-community" style="flex-direction:column;">
+  <div class="topbar">
+    <button class="ib back" onclick="history.back()"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
+    <div class="topbar-title" id="comm-detail-name">Community</div>
+    <button class="ib" id="comm-join-btn" onclick="toggleJoinCommunity()">Join</button>
   </div>
-  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-    <div id="pdf-reader-body" style="flex:1;overflow-y:auto;padding:0;background:#555;-webkit-overflow-scrolling:touch;">
-      <p style="color:#fff;text-align:center;padding-top:40px;">Loading PDF...</p>
+  <div class="scroll" id="comm-detail-scroll">
+    <div id="comm-banner" style="height:140px;background:linear-gradient(135deg,var(--G2),var(--G));display:flex;align-items:flex-end;padding:14px;flex-shrink:0;">
+      <div>
+        <div id="comm-detail-icon" style="font-size:40px;margin-bottom:4px;">🏘</div>
+        <div style="color:#fff;font-family:'Syne',sans-serif;font-size:18px;font-weight:800;" id="comm-detail-title">—</div>
+        <div style="color:rgba(255,255,255,.7);font-size:12px;" id="comm-detail-meta">0 members · public</div>
+      </div>
+    </div>
+    <div id="comm-detail-desc" style="padding:12px 14px 6px;font-size:13px;color:var(--muted);line-height:1.6;border-bottom:1px solid var(--border);"></div>
+    <!-- Post in community -->
+    <div id="comm-post-bar" style="display:none;padding:10px 12px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div id="comm-post-avi" style="width:36px;height:36px;border-radius:50%;background:var(--GBg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;overflow:hidden;"></div>
+        <div style="flex:1;background:var(--bg);border-radius:22px;padding:10px 14px;font-size:14px;color:var(--muted);cursor:pointer;" onclick="openCommPostModal()">Write something for the group...</div>
+      </div>
+    </div>
+    <div id="comm-posts-list" style="padding-bottom:20px;">
+      <div class="empty"><div class="ei">⏳</div><p>Loading posts...</p></div>
     </div>
   </div>
 </div>
@@ -799,7 +812,7 @@ textarea.inp{resize:none}
 <nav class="nav" id="nav">
   <button class="nb on" id="nb-feed" onclick="switchTab('feed')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Feed</button>
   <button class="nb" id="nb-create" onclick="switchTab('create')"><div class="nb-circle"><svg viewBox="0 0 24 24" stroke-width="2.5" style="width:22px;height:22px;"><path d="M12 5v14M5 12h14"/></svg></div>Post</button>
-  <button class="nb" id="nb-library" onclick="switchTab('library')"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Library</button>
+  <button class="nb" id="nb-communities" onclick="switchTab('communities')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Groups</button>
   <button class="nb" id="nb-friends" onclick="switchTab('friends')" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span id="friend-req-dot" style="display:none;position:absolute;top:6px;right:10px;width:9px;height:9px;background:var(--red);border-radius:50%;border:2px solid #fff;"></span>Friends</button>
   <button class="nb" id="nb-profile" onclick="switchTab('profile')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
 </nav>
@@ -826,31 +839,6 @@ textarea.inp{resize:none}
     </div>
     <p style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;line-height:1.6;">Photo saved to your Firebase database at full quality.</p>
     <button class="btn" id="av-save-btn" onclick="saveAvatar()" disabled>Save Photo ✓</button>
-  </div>
-</div>
-
-<div class="mbg" id="bk-modal" onclick="if(event.target===this)closeModal('bk-modal')">
-  <div class="modal">
-    <div class="mrow"><div class="mt">📖 Publish a Book</div><button class="ib" onclick="closeModal('bk-modal')"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
-    <div class="fl">BOOK TITLE *</div><input class="inp" id="bk-title" placeholder="Enter book title"/>
-    <div class="fl">AUTHOR NAME *</div><input class="inp" id="bk-author" placeholder="Author name"/>
-    <div class="fl">PRICE (৳) — 0 = free</div><input class="inp" id="bk-price" placeholder="0" type="number" min="0"/>
-    <div class="fl">SHORT DESCRIPTION</div><input class="inp" id="bk-desc" placeholder="What is this book about?"/>
-    <div class="fl">CATEGORY</div>
-    <div class="ctags" id="bk-cats" style="margin-bottom:12px;">
-      <div class="ctag" onclick="pickBkCat(this,'local')">📍 Local</div>
-      <div class="ctag" onclick="pickBkCat(this,'fiction')">📖 Fiction</div>
-      <div class="ctag" onclick="pickBkCat(this,'history')">🏛 History</div>
-      <div class="ctag" onclick="pickBkCat(this,'tech')">💻 Tech</div>
-      <div class="ctag" onclick="pickBkCat(this,'art')">🎨 Art</div>
-    </div>
-    <div class="field-label" style="margin-top:4px;">BOOK CONTENT (optional — .txt file)</div>
-    <div class="bk-zone" id="bk-zone" onclick="document.getElementById('fi-book').click()">
-      <div style="font-size:28px;margin-bottom:6px;">📄</div>
-      <div style="font-size:13px;color:var(--muted);" id="bk-zone-text">Tap to upload .txt file — readers open it inside the app</div>
-    </div>
-    <input type="file" id="fi-book" accept=".txt,text/plain" style="display:none" onchange="onBookFile(event)"/>
-    <button class="btn" onclick="submitBook()">Publish →</button>
   </div>
 </div>
 
@@ -885,39 +873,52 @@ textarea.inp{resize:none}
     <button class="btn" id="ep-save-btn" onclick="saveEditedPost()">Save Changes ✓</button>
   </div>
 </div>
-<!-- Library Upload Modal -->
-<div class="mbg" id="lib-modal" onclick="if(event.target===this)closeModal('lib-modal')">
+<!-- Create Community Modal -->
+<div class="mbg" id="create-comm-modal" onclick="if(event.target===this)closeModal('create-comm-modal')">
   <div class="modal">
-    <div class="mrow"><div class="mt">📚 Add Book to Library</div><button class="ib" onclick="closeModal('lib-modal')"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
-    <div class="fl">BOOK TITLE *</div><input class="inp" id="lib-title" placeholder="Enter book title"/>
-    <div class="fl">AUTHOR / WRITER *</div><input class="inp" id="lib-author" placeholder="Author name"/>
-    <div class="fl">PUBLICATION / PUBLISHER</div><input class="inp" id="lib-pub" placeholder="Publisher name"/>
-    <div class="fl">YEAR</div><input class="inp" id="lib-year" placeholder="e.g. 2024" type="number"/>
-    <div class="fl">SHORT DESCRIPTION</div><input class="inp" id="lib-desc" placeholder="What is this book about?"/>
+    <div class="mrow"><div class="mt">🏘 Create Community</div><button class="ib" onclick="closeModal('create-comm-modal')"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="fl">ICON (emoji)</div>
+    <input class="inp" id="comm-icon" placeholder="e.g. 🏡 🎓 ⚽ 🌿" maxlength="4"/>
+    <div class="fl">GROUP NAME *</div>
+    <input class="inp" id="comm-name" placeholder="e.g. Pabna Foodies"/>
+    <div class="fl">DESCRIPTION</div>
+    <textarea class="inp" id="comm-desc" placeholder="What is this group about?" rows="3"></textarea>
     <div class="fl">CATEGORY</div>
-    <div class="ctags" id="lib-cats" style="margin-bottom:12px;">
-      <div class="ctag" onclick="pickLibCat(this,'fiction')">📖 Fiction</div>
-      <div class="ctag" onclick="pickLibCat(this,'history')">🏛 History</div>
-      <div class="ctag" onclick="pickLibCat(this,'tech')">💻 Tech</div>
-      <div class="ctag" onclick="pickLibCat(this,'art')">🎨 Art</div>
-      <div class="ctag" onclick="pickLibCat(this,'local')">📍 Local</div>
-      <div class="ctag" onclick="pickLibCat(this,'science')">🔬 Science</div>
-      <div class="ctag" onclick="pickLibCat(this,'religion')">🕌 Religion</div>
+    <div class="ctags" id="comm-cats" style="margin-bottom:12px;">
+      <div class="ctag" onclick="pickCommCat(this,'local')">📍 Local</div>
+      <div class="ctag" onclick="pickCommCat(this,'food')">🍜 Food</div>
+      <div class="ctag" onclick="pickCommCat(this,'sport')">⚽ Sport</div>
+      <div class="ctag" onclick="pickCommCat(this,'education')">🎓 Education</div>
+      <div class="ctag" onclick="pickCommCat(this,'culture')">🏛 Culture</div>
+      <div class="ctag" onclick="pickCommCat(this,'business')">💼 Business</div>
+      <div class="ctag" onclick="pickCommCat(this,'nature')">🌿 Nature</div>
+      <div class="ctag" onclick="pickCommCat(this,'general')">💬 General</div>
     </div>
-    <label for="fi-lib-pdf" class="bk-zone" id="lib-zone" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-      <div style="font-size:32px;margin-bottom:8px;">📄</div>
-      <div style="font-size:14px;color:var(--G);font-weight:700;" id="lib-zone-text">Tap to choose PDF file</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Max 30MB · PDF files only</div>
-    </label>
-    <input type="file" id="fi-lib-pdf" accept="application/pdf" style="display:none" onchange="onLibPdfFile(event)"/>
-    <div class="prog" id="lib-prog" style="margin:0 0 8px;"><div class="prog-f" id="lib-prog-f"></div></div>
-    <button class="btn" id="lib-submit-btn" onclick="submitLibBook()">Add to Library →</button>
+    <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;margin-bottom:12px;">
+      <button id="comm-priv-public" onclick="pickCommPrivacy('public')" style="flex:1;padding:11px 8px;border:none;background:var(--G);color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">🌍 Public</button>
+      <button id="comm-priv-private" onclick="pickCommPrivacy('private')" style="flex:1;padding:11px 8px;border:none;background:#fff;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">🔒 Private</button>
+    </div>
+    <button class="btn" onclick="submitCreateCommunity()">Create Community →</button>
   </div>
 </div>
-<div id="toast"></div>
+
+<!-- Community Post Modal -->
+<div class="mbg" id="comm-post-modal" onclick="if(event.target===this)closeModal('comm-post-modal')">
+  <div class="modal">
+    <div class="mrow"><div class="mt">📝 Post in Group</div><button class="ib" onclick="closeModal('comm-post-modal')"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <textarea class="inp" id="comm-post-text" placeholder="Write something for the group..." rows="5" enterkeyhint="enter" inputmode="text" onkeydown="event.stopPropagation()" style="line-height:1.6;"></textarea>
+    <label for="fi-comm-post-img" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border-radius:12px;cursor:pointer;margin-bottom:8px;">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--G);fill:none;stroke-width:2;flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span style="font-size:13px;font-weight:600;color:var(--G);" id="comm-post-img-label">Add a photo (optional)</span>
+    </label>
+    <input type="file" id="fi-comm-post-img" accept="image/*" style="display:none" onchange="onCommPostPhoto(event)"/>
+    <button class="btn" id="comm-post-submit-btn" onclick="submitCommPost()">Post to Group →</button>
+  </div>
+</div>
 <input type="file" id="fi-post"   accept="image/*" style="display:none" onchange="onPostPhoto(event)"/>
 <input type="file" id="fi-avatar" accept="image/*" style="display:none" onchange="onAvatarPhoto(event)"/>
 <input type="file" id="fi-regav"  accept="image/*" style="display:none" onchange="onRegAvatarPhoto(event)"/>
+<div id="toast"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -962,9 +963,10 @@ function switchTab(tab){
   const nb=$('nb-'+tab);if(nb)nb.classList.add('on');
   history.pushState({page:prev},'');
   if(tab==='feed')loadFeed();if(tab==='map')initMap();
-  if(tab==='ebooks')loadBooks();if(tab==='profile')loadProfile();
+  if(tab==='profile')loadProfile();
   if(tab==='search')initSearch();if(tab==='notifs')loadNotifications();if(tab==='friends')loadFriendsPage();
-  if(tab==='library')loadLibrary();
+  if(tab==='communities')loadCommunities();
+  if(tab==='create')getLocation(); // fresh GPS on every post creation
 }
 window.addEventListener('popstate',(e)=>{
   // Close lightbox first
@@ -1071,13 +1073,13 @@ async function doRegister(){
   if(!phone||!name||!uname||!city||!pw){err.textContent='Please fill in all required fields.';err.style.display='block';return}
   if(pw.length<8){err.textContent='Password must be at least 8 characters.';err.style.display='block';return}
   if(uname.length<3){err.textContent='Username must be at least 3 characters.';err.style.display='block';return}
-  const btn=$('r-btn');btn.innerHTML='<span class="spin"></span> Checking...';btn.disabled=true;
+  const btn=$('r-btn');btn.textContent='⏳ Checking...';btn.disabled=true;
   try{
     const snap=await fs.getDocs(fs.query(fs.collection(db,'users'),fs.where('username','==',uname)));
     if(!snap.empty){err.textContent='❌ Username already taken.';err.style.display='block';btn.textContent='Create Account →';btn.disabled=false;return}
     let avatarUrl='';
-    if(regAvatarData){btn.innerHTML='<span class="spin"></span> Uploading photo...';try{avatarUrl=await uploadAvatar(regAvatarData.file)}catch(e){}}
-    btn.innerHTML='<span class="spin"></span> Creating account...';
+    if(regAvatarData){btn.textContent='⏳ Uploading photo...';try{avatarUrl=await uploadAvatar(regAvatarData.file)}catch(e){}}
+    btn.textContent='⏳ Creating account...';
     const udata={phone,full_name:name,username:uname,city,password:btoa(pw),about:about||'',avatar_url:avatarUrl,posts_count:0,followers_count:0,following_count:0,likes_received:0,verification_level:'basic',is_trusted_local:false,created_at:fs.serverTimestamp()};
     const ref=await fs.addDoc(fs.collection(db,'users'),udata);
     CU={id:ref.id,...udata,created_at:Date.now()};window._currentUID=CU.id;
@@ -1091,7 +1093,7 @@ async function doLogin(){
   const identifier=$('l-id').value.trim(),pw=$('l-pw').value,err=$('l-err');
   err.style.display='none';
   if(!identifier||!pw){err.textContent='Please fill in all fields.';err.style.display='block';return}
-  const btn=$('l-btn');btn.innerHTML='<span class="spin"></span>';btn.disabled=true;
+  const btn=$('l-btn');btn.textContent='⏳';btn.disabled=true;
   try{
     let snap=await fs.getDocs(fs.query(fs.collection(db,'users'),fs.where('phone','==',identifier)));
     if(snap.empty)snap=await fs.getDocs(fs.query(fs.collection(db,'users'),fs.where('username','==',identifier)));
@@ -1130,15 +1132,31 @@ function launchApp(){
 }
 
 // ── LOCATION ──────────────────────────────────────────────
-function getLocation(){
+function getLocation(onDone){
   const lbl=$('loc-lbl');
-  if(!navigator.geolocation){if(lbl)lbl.textContent='GPS not available';return}
+  if(lbl) lbl.textContent='📡 Getting your location...';
+  if(!navigator.geolocation){
+    userLoc={lat:24.0065,lng:89.2438,name:'Pabna, Rajshahi'};
+    if(lbl)lbl.textContent='GPS not available · using default';
+    if(onDone)onDone(userLoc);
+    return;
+  }
   navigator.geolocation.getCurrentPosition(pos=>{
     userLoc={lat:pos.coords.latitude,lng:pos.coords.longitude};
     if(lbl)lbl.textContent=userLoc.lat.toFixed(4)+', '+userLoc.lng.toFixed(4)+' · GPS tagged';
     fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLoc.lat}&lon=${userLoc.lng}&format=json`)
-      .then(r=>r.json()).then(d=>{const a=d.address;const n=[a.village||a.town||a.city||a.county,a.state].filter(Boolean).join(', ');userLoc.name=n||'Your location';if(lbl)lbl.textContent=(n||'Your location')+' · GPS tagged'}).catch(()=>{});
-  },()=>{userLoc={lat:24.0065,lng:89.2438,name:'Pabna, Rajshahi'};if(lbl)lbl.textContent='Pabna, Rajshahi · (enable GPS for exact location)'});
+      .then(r=>r.json()).then(d=>{
+        const a=d.address;
+        const n=[a.village||a.town||a.city||a.county,a.state].filter(Boolean).join(', ');
+        userLoc.name=n||'Your location';
+        if(lbl)lbl.textContent=(n||'Your location')+' · GPS tagged ✅';
+        if(onDone)onDone(userLoc);
+      }).catch(()=>{if(onDone)onDone(userLoc);});
+  },()=>{
+    userLoc={lat:24.0065,lng:89.2438,name:'Pabna, Rajshahi'};
+    if(lbl)lbl.textContent='Enable GPS for your exact location';
+    if(onDone)onDone(userLoc);
+  },{enableHighAccuracy:true,timeout:10000,maximumAge:0});
 }
 
 // ── FEED ──────────────────────────────────────────────────
@@ -1393,15 +1411,26 @@ async function submitPost(){
   if(!CU){toast('Please sign in first');return}
   if(!chosenPostPhoto){toast('📷 Please pick a photo first');return}
   const cap=$('c-cap').value.trim();
-  const btn=$('post-btn');btn.innerHTML='<span class="spin"></span> Saving...';btn.disabled=true;
-  const prog=$('prog'),fill=$('prog-f');prog.style.display='block';fill.style.width='10%';
+  const btn=$('post-btn');btn.textContent='⏳ Getting location...';btn.disabled=true;
+  const prog=$('prog'),fill=$('prog-f');prog.style.display='block';fill.style.width='5%';
+
+  // Capture a fresh GPS reading right now — not the stale one from app launch
+  await new Promise(resolve=>{
+    if(!navigator.geolocation){resolve();return;}
+    navigator.geolocation.getCurrentPosition(pos=>{
+      userLoc={lat:pos.coords.latitude,lng:pos.coords.longitude,name:userLoc?.name||'Local'};
+      resolve();
+    },()=>resolve(),{enableHighAccuracy:true,timeout:8000,maximumAge:30000});
+  });
+
+  btn.textContent='⏳ Saving...';fill.style.width='10%';
   try{
     const mediaUrl=await uploadPostPhoto(chosenPostPhoto.file,pct=>{fill.style.width=pct+'%'});
     const postData={uid:CU.id,full_name:CU.full_name,username:CU.username,avatar_url:CU.avatar_url||'',city:CU.city,location_name:userLoc?.name||CU.city||'Local',latitude:userLoc?.lat||null,longitude:userLoc?.lng||null,caption:cap,category:chosenCat||'other',privacy:_postPrivacy||'public',media_url:mediaUrl,likes:[],comments_count:0,verification_level:CU.verification_level||'basic',is_trusted_local:CU.is_trusted_local||false,ai_flag:false,created_at:fs.serverTimestamp()};
     await fs.addDoc(fs.collection(db,'posts'),postData);
     try{await fs.updateDoc(fs.doc(db,'users',CU.id),{posts_count:fs.increment(1)})}catch(e){}
     setTimeout(()=>{prog.style.display='none';fill.style.width='0%'},500);
-    toast('✅ Post shared at full quality! 🎉');
+    toast('✅ Post shared! 🎉');
     btn.textContent='Share Post ✓';btn.disabled=false;
     chosenPostPhoto=null;chosenCat=null;_originalPhotoFile=null;
     $('c-cap').value='';$('pz').classList.remove('filled');$('pp').src='';
@@ -1506,49 +1535,13 @@ function onAvatarPhoto(e){
 }
 async function saveAvatar(){
   if(!chosenAvatarData){toast('Please choose a photo first');return}
-  const btn=$('av-save-btn');btn.innerHTML='<span class="spin"></span> Saving...';btn.disabled=true;
+  const btn=$('av-save-btn');btn.textContent='⏳ Saving...';btn.disabled=true;
   try{
-    const url=await uploadAvatar(chosenAvatarData.file,pct=>{btn.innerHTML='<span class="spin"></span> '+pct+'%...'});
+    const url=await uploadAvatar(chosenAvatarData.file,pct=>{btn.textContent='⏳ '+pct+'%...'});
     await fs.updateDoc(fs.doc(db,'users',CU.id),{avatar_url:url});
     CU={...CU,avatar_url:url};localStorage.setItem('ln_sess',JSON.stringify(CU));
     closeModal('avatar-modal');toast('✅ Profile photo saved!');loadProfile();
   }catch(e){console.error('Avatar:',e);toast('❌ Could not save: '+e.message);btn.textContent='Save Photo ✓';btn.disabled=false}
-}
-
-// ── EBOOKS ────────────────────────────────────────────────
-const DEMO_BOOKS=[{id:'b1',title:'Streets of Rajshahi',author_name:'Arif Chowdhury',price:0,category:'local',cc:'#a8d5b5'},{id:'b2',title:'The Padma Chronicles',author_name:'Sultana Razia',price:49,category:'local',cc:'#b3d4f5'},{id:'b3',title:'Mango Capital Tales',author_name:'Habib Rahman',price:0,category:'local',cc:'#f5d4a8'},{id:'b4',title:'Verified: A Digital Life',author_name:'Nadia Islam',price:99,category:'tech',cc:'#d4b8f5'}];
-function setBkFilter(el,f){document.querySelectorAll('#bk-chips .chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');bkFilter=f;loadBooks()}
-async function loadBooks(){
-  let books=[...DEMO_BOOKS];
-  try{const snap=await fs.getDocs(fs.collection(db,'books'));snap.docs.forEach(d=>{const bk={id:d.id,...d.data()};if(!books.find(b=>b.id===bk.id))books.push(bk)})}catch(e){}
-  if(bkFilter==='free')books=books.filter(b=>b.price===0);if(bkFilter==='local')books=books.filter(b=>b.category==='local');
-  const grid=$('bk-grid');grid.innerHTML='';
-  if(!books.length){grid.innerHTML='<div style="grid-column:span 2;text-align:center;padding:40px;color:var(--muted);">No books found.</div>';return}
-  books.forEach(b=>{
-    const col=b.cc||COLORS[strHash(b.id)%COLORS.length];
-    const card=document.createElement('div');card.className='bc';
-    card.onclick=()=>openBookReader(b);
-    card.innerHTML=`<div class="bcv" style="background:${col};">${EMOJI[b.category]||'📖'}${b.price===0?'<div class="ft">FREE</div>':''}</div><div class="bi"><div class="bt">${esc(b.title)}</div><div class="ba">✅ ${esc(b.author_name)}</div><div class="bp">${b.price===0?'Free':'৳ '+b.price}</div></div>`;
-    grid.appendChild(card);
-  });
-}
-function pickBkCat(el,cat){document.querySelectorAll('#bk-cats .ctag').forEach(c=>c.classList.remove('on'));el.classList.add('on');chosenBkCat=cat}
-function openBookModal(){if(!CU){toast('Sign in to publish a book');return}openModal('bk-modal')}
-async function submitBook(){
-  const title=$('bk-title').value.trim(),author=$('bk-author').value.trim()||CU?.full_name;
-  const price=parseInt($('bk-price').value)||0,desc=$('bk-desc').value.trim();
-  if(!title||!author){toast('Title and author are required');return}
-  try{
-    await fs.addDoc(fs.collection(db,'books'),{title,author_name:author,price,description:desc,
-      category:chosenBkCat||'local',cc:COLORS[Math.floor(Math.random()*COLORS.length)],
-      content:_bookTxt||'',uid:CU.id,created_at:fs.serverTimestamp()});
-    closeModal('bk-modal');
-    $('bk-title').value='';$('bk-author').value='';$('bk-price').value='';$('bk-desc').value='';
-    const bkz=$('bk-zone');if(bkz)bkz.classList.remove('has-file');
-    const fib=document.getElementById('fi-book');if(fib)fib.value='';
-    _bookTxt='';chosenBkCat=null;
-    toast('📚 Book published!');loadBooks();
-  }catch(e){toast('Could not publish. Try again.')}
 }
 
 // ── BOOT ──────────────────────────────────────────────────
@@ -1716,46 +1709,6 @@ async function sendMsg(){
 }
 
 // addMsgBtn replaced by onMessageTap
-
-// ═══════════════════════════════════════════════════════
-//  BOOK READER + UPLOAD
-// ═══════════════════════════════════════════════════════
-let _bookTxt='';
-
-function onBookFile(e){
-  const file=e.target.files[0];if(!file)return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    _bookTxt=ev.target.result;
-    const zone=$('bk-zone'),txt=$('bk-zone-text');
-    zone.classList.add('has-file');
-    txt.textContent='✅ '+file.name+' ('+Math.round(file.size/1024)+'KB ready)';
-  };
-  r.readAsText(file,'UTF-8');
-}
-
-function openBookReader(book){
-  var content=book.content||'';
-  $('reader-title').textContent=book.title||'Book';
-  var body=$('reader-body');
-  if(!content&&!book.description){
-    body.innerHTML='<p style="color:var(--muted);text-align:center;padding:40px 0;">No content uploaded yet.</p>';
-  } else if(content){
-    var paras=content.split('\n\n').map(function(p){return p.trim();}).filter(function(p){return p.length>0;});
-    var html=paras.map(function(p){
-      if(p.indexOf('# ')==0) return '<h1>'+esc(p.slice(2))+'</h1>';
-      if(p.indexOf('## ')==0) return '<h2>'+esc(p.slice(3))+'</h2>';
-      return '<p>'+esc(p).split('\n').join('<br>')+'</p>';
-    }).join('');
-    body.innerHTML='<h1>'+esc(book.title||'')+'</h1>'
-      +(book.author_name?'<p style="color:var(--muted);font-size:13px;margin-bottom:20px;">by '+esc(book.author_name)+'</p>':'')
-      +html;
-  } else {
-    body.innerHTML='<h1>'+esc(book.title||'')+'</h1><p>'+esc(book.description||'')+'</p>';
-  }
-  navTo('pg-reader');
-}
-
 
 // ═══════════════════════════════════════════════════════
 //  PRIVACY SYSTEM
@@ -2687,446 +2640,321 @@ function checkUnreadDMs(){
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  LIBRARY (PDF Books)
+//  COMMUNITIES SYSTEM
 // ═══════════════════════════════════════════════════════════════════
-let _libFilter = 'all';
-let _libPdfData = null;
-let _libChosenCat = null;
+let _commTab='discover';
+let _activeCommunity=null;
+let _commCat=null;
+let _commPrivacy='public';
+let _commPostImg=null;
+const COMM_COLORS=['#a8d5b5','#b3d4f5','#f5d4a8','#d4b8f5','#f5b8c8','#b8f5d4','#c8f0f5','#f5c8a8'];
 
-function setLibFilter(el, f){
-  document.querySelectorAll('#lib-chips .chip').forEach(c=>c.classList.remove('on'));
-  el.classList.add('on'); _libFilter=f; loadLibrary();
+function setCommTab(el,tab){
+  document.querySelectorAll('#comm-chips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); _commTab=tab; loadCommunities();
+}
+function pickCommCat(el,cat){
+  document.querySelectorAll('#comm-cats .ctag').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); _commCat=cat;
+}
+function pickCommPrivacy(val){
+  _commPrivacy=val;
+  const pb=$('comm-priv-public'),fb=$('comm-priv-private');
+  if(!pb||!fb)return;
+  if(val==='public'){pb.style.background='var(--G)';pb.style.color='#fff';fb.style.background='#fff';fb.style.color='var(--muted)';}
+  else{fb.style.background='var(--G)';fb.style.color='#fff';pb.style.background='#fff';pb.style.color='var(--muted)';}
 }
 
-function pickLibCat(el, cat){
-  document.querySelectorAll('#lib-cats .ctag').forEach(c=>c.classList.remove('on'));
-  el.classList.add('on'); _libChosenCat=cat;
+function openCreateCommunityModal(){
+  if(!CU){toast('Sign in to create a community');return;}
+  $('comm-icon').value='';$('comm-name').value='';$('comm-desc').value='';
+  document.querySelectorAll('#comm-cats .ctag').forEach(c=>c.classList.remove('on'));
+  _commCat=null; _commPrivacy='public'; pickCommPrivacy('public');
+  openModal('create-comm-modal');
 }
 
-function openLibModal(){
-  if(!CU){ toast('Sign in to add books'); return; }
-  $('lib-title').value='';$('lib-author').value='';$('lib-pub').value='';$('lib-year').value='';$('lib-desc').value='';
-  $('lib-zone-text').textContent='Tap to choose PDF from gallery';
-  $('lib-zone').style.borderColor='';
-  $('lib-zone').classList.remove('has-file');
-  _libPdfData=null; _libChosenCat=null;
-  document.querySelectorAll('#lib-cats .ctag').forEach(c=>c.classList.remove('on'));
-  $('lib-prog').style.display='none';
-  openModal('lib-modal');
-}
-
-function triggerLibPdf(){
-  // Kept for compatibility but label now handles this
-  document.getElementById('fi-lib-pdf').click();
-}
-
-function onLibPdfFile(e){
-  const file=e.target.files[0]; if(!file) return;
-  const maxBytes = 30 * 1024 * 1024; // 30MB
-  if(file.size > maxBytes){
-    toast('⚠️ PDF too large. Maximum size is 30MB.');
-    $('lib-zone-text').textContent='Tap to choose PDF file';
-    e.target.value='';
-    return;
-  }
-  $('lib-zone-text').textContent='⏳ Reading file... ('+Math.round(file.size/1024/1024*10)/10+'MB)';
-  $('lib-zone').style.borderColor='var(--G)';
-  const r=new FileReader();
-  r.onload=ev=>{
-    _libPdfData={base64:ev.target.result, name:file.name, size:file.size};
-    $('lib-zone').classList.add('has-file');
-    $('lib-zone-text').textContent='✅ '+file.name+' ('+Math.round(file.size/1024)+'KB ready)';
-  };
-  r.onerror=()=>{ toast('Could not read PDF file.'); $('lib-zone-text').textContent='Tap to choose PDF file'; $('lib-zone').style.borderColor=''; };
-  r.readAsDataURL(file);
-}
-
-async function submitLibBook(){
-  const title=$('lib-title').value.trim(), author=$('lib-author').value.trim();
-  const pub=$('lib-pub').value.trim(), year=$('lib-year').value.trim();
-  const desc=$('lib-desc').value.trim();
-  if(!title||!author){ toast('Title and author are required'); return; }
-  if(!_libPdfData){ toast('Please upload a PDF file'); return; }
-  const btn=$('lib-submit-btn');
-  btn.innerHTML='<span class="spin"></span> Uploading...'; btn.disabled=true;
-  const prog=$('lib-prog'), fill=$('lib-prog-f');
-  prog.style.display='block'; fill.style.width='5%';
+async function submitCreateCommunity(){
+  const name=$('comm-name').value.trim();
+  const desc=$('comm-desc').value.trim();
+  const icon=$('comm-icon').value.trim()||'🏘';
+  if(!name){toast('Group name is required');return;}
+  const btn=document.querySelector('#create-comm-modal .btn');
+  btn.textContent='⏳ Creating...';btn.disabled=true;
   try{
-    // Split base64 into 700KB chunks to stay under Firestore 1MB doc limit
-    const CHUNK = 700 * 1024; // 700KB per chunk (base64 chars)
-    const b64 = _libPdfData.base64;
-    const totalChunks = Math.ceil(b64.length / CHUNK);
-    const chunks = [];
-    for(let i=0;i<totalChunks;i++) chunks.push(b64.slice(i*CHUNK,(i+1)*CHUNK));
-
-    // Create the main library doc first (without pdf_data)
-    const docRef = await fs.addDoc(fs.collection(db,'library'),{
-      title, author_name:author, publisher:pub||'', year:year||'',
-      description:desc, category:_libChosenCat||'fiction',
-      pdf_name:_libPdfData.name, pdf_size:_libPdfData.size,
-      pdf_chunks: totalChunks, // how many chunk docs to load
-      uid:CU.id, uploader_name:CU.full_name, uploader_username:CU.username,
+    const ref=await fs.addDoc(fs.collection(db,'communities'),{
+      name, description:desc, icon, category:_commCat||'general',
+      privacy:_commPrivacy, creator_uid:CU.id,
+      creator_name:CU.full_name, creator_username:CU.username,
+      members:[CU.id], members_count:1,
       created_at:fs.serverTimestamp()
     });
+    btn.textContent='Create Community →';btn.disabled=false;
+    closeModal('create-comm-modal');
+    toast('✅ Community created!');
+    openCommunity({id:ref.id,name,description:desc,icon,category:_commCat||'general',privacy:_commPrivacy,creator_uid:CU.id,members:[CU.id],members_count:1});
+  }catch(e){toast('❌ '+e.message);btn.textContent='Create Community →';btn.disabled=false;}
+}
 
-    // Store each chunk as a subcollection doc
-    for(let i=0;i<chunks.length;i++){
-      await fs.setDoc(fs.doc(db,'library',docRef.id,'chunks','chunk_'+i),{data:chunks[i],index:i});
-      fill.style.width = Math.round(10 + (i+1)/chunks.length*88) + '%';
+function isJoined(comm){
+  if(!CU||!comm)return false;
+  return Array.isArray(comm.members)&&comm.members.includes(CU.id);
+}
+
+async function toggleJoinCommunity(){
+  if(!CU){toast('Sign in to join communities');return;}
+  if(!_activeCommunity){return;}
+  const cid=_activeCommunity.id;
+  const joined=isJoined(_activeCommunity);
+  try{
+    if(joined){
+      await fs.updateDoc(fs.doc(db,'communities',cid),{
+        members:fs.arrayRemove(CU.id),
+        members_count:fs.increment(-1)
+      });
+      _activeCommunity.members=(_activeCommunity.members||[]).filter(u=>u!==CU.id);
+      _activeCommunity.members_count=Math.max(0,(_activeCommunity.members_count||1)-1);
+      toast('Left the community.');
+    } else {
+      await fs.updateDoc(fs.doc(db,'communities',cid),{
+        members:fs.arrayUnion(CU.id),
+        members_count:fs.increment(1)
+      });
+      if(!_activeCommunity.members)_activeCommunity.members=[];
+      _activeCommunity.members.push(CU.id);
+      _activeCommunity.members_count=(_activeCommunity.members_count||0)+1;
+      toast('✅ Joined!');
     }
+    updateCommJoinBtn();
+    loadCommPosts(_activeCommunity.id);
+  }catch(e){toast('Could not update membership.');}
+}
 
-    fill.style.width='100%';
-    setTimeout(()=>{ prog.style.display='none'; fill.style.width='0%'; },500);
-    btn.textContent='Add to Library →'; btn.disabled=false;
-    closeModal('lib-modal');
-    toast('📚 Book added to library!');
-    loadLibrary();
-  }catch(e){
-    console.error('Library upload:',e);
-    toast('❌ Could not upload: '+e.message);
-    btn.textContent='Add to Library →'; btn.disabled=false;
-    prog.style.display='none';
+function updateCommJoinBtn(){
+  const btn=$('comm-join-btn');
+  const postBar=$('comm-post-bar');
+  if(!btn)return;
+  const joined=isJoined(_activeCommunity);
+  btn.textContent=joined?'✓ Joined':'+ Join';
+  btn.style.background=joined?'var(--bg)':'var(--G)';
+  btn.style.color=joined?'var(--muted)':'#fff';
+  btn.style.border=joined?'1.5px solid var(--border)':'none';
+  btn.style.borderRadius='20px';
+  btn.style.padding='6px 14px';
+  btn.style.fontSize='13px';
+  btn.style.fontWeight='700';
+  if(postBar) postBar.style.display=joined?'block':'none';
+  // Fill avatar in post bar
+  if(joined&&CU){
+    const avi=$('comm-post-avi');
+    if(avi){
+      if(CU.avatar_url) avi.innerHTML='<img src="'+CU.avatar_url+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt=""/>';
+      else{avi.textContent=initial(CU.full_name);avi.style.background=COMM_COLORS[strHash(CU.id)%COMM_COLORS.length]+'44';}
+    }
   }
 }
 
-const LIB_EMOJI={fiction:'📖',history:'🏛',tech:'💻',art:'🎨',local:'📍',science:'🔬',religion:'🕌'};
-
-async function loadLibrary(){
-  const grid=$('lib-grid');
-  grid.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
+async function loadCommunities(){
+  const listEl=$('comm-list');
+  listEl.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading...</p></div>';
   try{
-    const snap=await fs.getDocs(fs.collection(db,'library'));
-    let books=snap.docs.map(d=>({id:d.id,...d.data()}));
-    // sort newest first
-    books.sort((a,b)=>{
+    const snap=await fs.getDocs(fs.collection(db,'communities'));
+    let comms=snap.docs.map(d=>({id:d.id,...d.data()}));
+    comms.sort((a,b)=>(b.members_count||0)-(a.members_count||0));
+    if(_commTab==='mine'){
+      if(!CU){listEl.innerHTML='<div class="empty"><div class="ei">👤</div><p>Sign in to see your groups.</p></div>';return;}
+      comms=comms.filter(c=>Array.isArray(c.members)&&c.members.includes(CU.id));
+    }
+    if(!comms.length){
+      listEl.innerHTML='<div class="empty"><div class="ei">🏘</div><p>No communities yet.<br>Be the first to create one!</p></div>';return;
+    }
+    listEl.innerHTML='';
+    comms.forEach(c=>listEl.appendChild(buildCommCard(c)));
+  }catch(e){
+    listEl.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Could not load communities.<br>Check your connection.</p></div>';
+    console.error('loadCommunities:',e);
+  }
+}
+
+function buildCommCard(c){
+  const col=COMM_COLORS[strHash(c.id)%COMM_COLORS.length];
+  const joined=isJoined(c);
+  const div=document.createElement('div');
+  div.className='comm-card';
+  div.innerHTML=`
+    <div class="comm-banner-strip" style="background:${col}33;">
+      <div class="comm-icon-big">${esc(c.icon||'🏘')}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="comm-card-title">${esc(c.name)}</div>
+        <div class="comm-card-meta">${fmtN(c.members_count||0)} members · ${c.privacy||'public'} · ${c.category||'general'}</div>
+      </div>
+    </div>
+    ${c.description?`<div class="comm-card-desc">${esc(c.description).substring(0,100)}${c.description.length>100?'…':''}</div>`:''}
+    <div class="comm-card-footer">
+      <div style="font-size:12px;color:var(--muted);">by ${esc(c.creator_name||'Unknown')}</div>
+      <button class="comm-join-pill ${joined?'joined':'join'}" onclick="event.stopPropagation();handleCardJoin(event,this,'${c.id}')">${joined?'✓ Joined':'+ Join'}</button>
+    </div>`;
+  div.onclick=()=>openCommunity(c);
+  return div;
+}
+
+async function handleCardJoin(e,btn,cid){
+  e.stopPropagation();
+  if(!CU){toast('Sign in to join communities');return;}
+  const snap=await fs.getDoc(fs.doc(db,'communities',cid));
+  if(!snap.exists())return;
+  const c={id:cid,...snap.data()};
+  const joined=isJoined(c);
+  try{
+    if(joined){
+      await fs.updateDoc(fs.doc(db,'communities',cid),{members:fs.arrayRemove(CU.id),members_count:fs.increment(-1)});
+      btn.textContent='+ Join';btn.className='comm-join-pill join';toast('Left the group.');
+    } else {
+      await fs.updateDoc(fs.doc(db,'communities',cid),{members:fs.arrayUnion(CU.id),members_count:fs.increment(1)});
+      btn.textContent='✓ Joined';btn.className='comm-join-pill joined';toast('✅ Joined!');
+    }
+  }catch(e){toast('Could not update. Try again.');}
+}
+
+function openCommunity(c){
+  _activeCommunity=c;
+  $('comm-detail-name').textContent=c.name||'Community';
+  $('comm-detail-title').textContent=c.name||'Community';
+  $('comm-detail-icon').textContent=c.icon||'🏘';
+  $('comm-detail-meta').textContent=fmtN(c.members_count||0)+' members · '+(c.privacy||'public')+' · '+(c.category||'general');
+  $('comm-detail-desc').textContent=c.description||'';
+  const col=COMM_COLORS[strHash(c.id)%COMM_COLORS.length];
+  $('comm-banner').style.background=`linear-gradient(135deg,${col},${col}88)`;
+  updateCommJoinBtn();
+  loadCommPosts(c.id);
+  navTo('pg-community');
+}
+
+async function loadCommPosts(cid){
+  const listEl=$('comm-posts-list');
+  listEl.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Loading posts...</p></div>';
+  try{
+    const snap=await fs.getDocs(fs.query(
+      fs.collection(db,'communities',cid,'posts'),
+      fs.limit(50)
+    ));
+    const posts=snap.docs.map(d=>({id:d.id,...d.data()}));
+    posts.sort((a,b)=>{
       const ta=a.created_at?.toMillis?a.created_at.toMillis():(a.created_at||0);
       const tb=b.created_at?.toMillis?b.created_at.toMillis():(b.created_at||0);
       return tb-ta;
     });
-    if(_libFilter!=='all') books=books.filter(b=>b.category===_libFilter);
-    if(!books.length){
-      grid.innerHTML='<div class="empty"><div class="ei">📚</div><p>No books yet.<br>Be the first to add one!</p></div>'; return;
+    listEl.innerHTML='';
+    if(!posts.length){
+      listEl.innerHTML='<div class="empty"><div class="ei">📝</div><p>No posts yet.<br>Join and be the first to post!</p></div>';return;
     }
-    grid.innerHTML='';
-    // Wrap in a grid container
-    const wrapper=document.createElement('div');
-    wrapper.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:13px;padding-bottom:90px;';
-    books.forEach(b=>{
-      const col=b.cc||(['#a8d5b5','#b3d4f5','#f5d4a8','#d4b8f5','#f5b8c8','#b8f5d4'])[Math.abs(b.id.charCodeAt(0))%6];
-      const card=document.createElement('div');
-      card.className='bc';
-      card.onclick=()=>openPDFReader(b);
-      card.innerHTML=`<div class="bcv" style="background:${col||'#e8f5ee'};flex-direction:column;gap:4px;">
-        <div style="font-size:32px;">${LIB_EMOJI[b.category]||'📖'}</div>
-        <div style="font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,.3);padding:2px 7px;border-radius:4px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(b.category||'book').toUpperCase()}</div>
+    posts.forEach(p=>listEl.appendChild(buildCommPost(p,cid)));
+  }catch(e){
+    listEl.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Could not load posts.</p></div>';
+    console.error('loadCommPosts:',e);
+  }
+}
+
+function buildCommPost(p,cid){
+  const bgC=COMM_COLORS[strHash(p.uid||p.id)%COMM_COLORS.length];
+  const liked=CU&&Array.isArray(p.likes)&&p.likes.includes(CU.id);
+  const lc=Array.isArray(p.likes)?p.likes.length:0;
+  const div=document.createElement('div');
+  div.className='comm-post';
+  div.innerHTML=`
+    <div class="comm-post-header">
+      <div style="width:36px;height:36px;border-radius:50%;background:${bgC}33;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;overflow:hidden;flex-shrink:0;cursor:pointer;" onclick="viewUserProfile('${p.uid}')">
+        ${p.avatar_url?`<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt=""/>`:''}
+        ${!p.avatar_url?initial(p.full_name||'?'):''}
       </div>
-      <div class="bi">
-        <div class="bt">${esc(b.title)}</div>
-        <div class="ba" style="margin-top:2px;">✍️ ${esc(b.author_name)}</div>
-        ${b.publisher?'<div class="ba">🏢 '+esc(b.publisher)+'</div>':''}
-        ${b.year?'<div class="ba">📅 '+esc(b.year)+'</div>':''}
-        <div style="margin-top:5px;font-size:11px;color:var(--G);font-weight:700;">📄 PDF · Free</div>
-      </div>`;
-      wrapper.appendChild(card);
+      <div style="flex:1;min-width:0;cursor:pointer;" onclick="viewUserProfile('${p.uid}')">
+        <div style="font-weight:700;font-size:13px;">${esc(p.full_name||'User')}</div>
+        <div style="font-size:11px;color:var(--muted);">${fmtTime(p.created_at||p.ts)}</div>
+      </div>
+      ${CU&&p.uid===CU.id?`<button onclick="deleteCommPost('${cid}','${p.id}',this)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:4px;">🗑</button>`:''}
+    </div>
+    ${p.text?`<div class="comm-post-body">${esc(p.text)}</div>`:''}
+    ${p.img_url?`<img class="comm-post-img" src="${p.img_url}" alt="" onclick="openImgLightbox('${p.img_url}')" style="cursor:pointer;"/>` :''}
+    <div class="comm-post-actions">
+      <button class="ab ${liked?'liked':''}" id="cplb-${p.id}" onclick="toggleCommLike('${cid}','${p.id}',${liked},this)">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="${liked?'var(--red)':'none'}"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span>${fmtN(lc)}</span>
+      </button>
+    </div>`;
+  return div;
+}
+
+async function toggleCommLike(cid,pid,wasLiked,btn){
+  if(!CU){toast('Sign in to like posts');return;}
+  const now=!wasLiked;
+  btn.classList.toggle('liked',now);
+  const svg=btn.querySelector('svg');
+  svg.setAttribute('fill',now?'var(--red)':'none');
+  svg.setAttribute('stroke',now?'var(--red)':'currentColor');
+  const span=btn.querySelector('span');
+  span.textContent=fmtN(Math.max(0,(parseInt(span.textContent)||0)+(now?1:-1)));
+  try{
+    await fs.updateDoc(fs.doc(db,'communities',cid,'posts',pid),{
+      likes:now?fs.arrayUnion(CU.id):fs.arrayRemove(CU.id)
     });
-    grid.appendChild(wrapper);
-  }catch(e){
-    grid.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Could not load library.<br>Check your connection.</p></div>';
-    console.error('Library:',e);
-  }
+  }catch(e){console.warn('toggleCommLike:',e);}
 }
 
-async function openPDFReader(book){
-  $('pdf-reader-title').textContent=book.title||'Book';
-  const body=$('pdf-reader-body');
-  body.innerHTML='<p style="color:#fff;text-align:center;padding:40px 16px;">⏳ Loading PDF...</p>';
-  const dl=$('pdf-download-link');
-  dl.style.display='none';
-  navTo('pg-pdfreader');
-
+async function deleteCommPost(cid,pid,btn){
+  if(!CU||!confirm('Delete this post?'))return;
   try{
-    let fullB64='';
-    if(book.pdf_chunks && book.pdf_chunks>0){
-      // Reassemble from chunks subcollection
-      const chunkDocs=[];
-      for(let i=0;i<book.pdf_chunks;i++){
-        const snap=await fs.getDoc(fs.doc(db,'library',book.id,'chunks','chunk_'+i));
-        if(snap.exists()) chunkDocs.push({index:i,data:snap.data().data});
-      }
-      chunkDocs.sort((a,b)=>a.index-b.index);
-      fullB64=chunkDocs.map(c=>c.data).join('');
-    } else if(book.pdf_data){
-      fullB64=book.pdf_data;
-    }
-
-    if(!fullB64){
-      body.innerHTML='<div style="padding:20px;color:#fff;text-align:center;"><p>No PDF content found.</p><p style="font-size:12px;opacity:.6;margin-top:8px;">'+esc(book.description||'')+'</p></div>';
-      return;
-    }
-
-    // Convert base64 to Blob → object URL (works on mobile, no iframe sandbox issues)
-    const byteChars=atob(fullB64.split(',')[1]||fullB64);
-    const byteArr=new Uint8Array(byteChars.length);
-    for(let i=0;i<byteChars.length;i++) byteArr[i]=byteChars.charCodeAt(i);
-    const blob=new Blob([byteArr],{type:'application/pdf'});
-    const objUrl=URL.createObjectURL(blob);
-
-    // Download button
-    dl.href=objUrl; dl.download=book.pdf_name||book.title+'.pdf'; dl.style.display='flex';
-
-    // Render
-    body.innerHTML='';
-    body.style.overflow='hidden'; body.style.padding='0';
-    const iframe=document.createElement('iframe');
-    iframe.style.cssText='width:100%;height:100%;border:none;display:block;background:#fff;';
-    iframe.src=objUrl;
-    body.appendChild(iframe);
-
-    // Fallback message in case iframe blocks PDF (some mobile browsers)
-    setTimeout(()=>{
-      const msg=document.createElement('div');
-      msg.style.cssText='position:absolute;bottom:60px;left:0;right:0;text-align:center;';
-      msg.innerHTML='<a href="'+objUrl+'" download="'+(book.pdf_name||'book.pdf')+'" style="background:var(--G);color:#fff;padding:10px 20px;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none;">⬇ Download PDF</a>';
-      body.style.position='relative';
-      body.appendChild(msg);
-    },1000);
-  }catch(e){
-    body.innerHTML='<div style="padding:20px;color:#fff;text-align:center;"><p>❌ Could not load PDF.<br>Try downloading it instead.</p></div>';
-    console.error('openPDFReader:',e);
-  }
+    await fs.deleteDoc(fs.doc(db,'communities',cid,'posts',pid));
+    btn.closest('.comm-post').remove();
+    toast('Post deleted.');
+  }catch(e){toast('Could not delete.');}
 }
 
-function profileToggleLike(btn){
-  var pid=btn.dataset.pid;
-  var wasLiked=(btn.dataset.lk==='true');
-  toggleLike(pid,wasLiked);
+// Post to community
+function openCommPostModal(){
+  if(!CU){toast('Sign in to post');return;}
+  if(!_activeCommunity||!isJoined(_activeCommunity)){toast('Join the group first');return;}
+  $('comm-post-text').value='';
+  $('comm-post-img-label').textContent='Add a photo (optional)';
+  _commPostImg=null;
+  $('fi-comm-post-img').value='';
+  openModal('comm-post-modal');
 }
 
-// ═══════════════════════════════════════════════════════
-// PULL TO REFRESH
-// ═══════════════════════════════════════════════════════
-let _ptrStartY=0, _ptrActive=false, _ptrDoing=false;
-function onFeedScroll(el){
-  // handled by touch events
-}
-(function initPTR(){
-  document.addEventListener('touchstart',e=>{
-    const fl=document.getElementById('feed-list');
-    if(!fl||!fl.contains(e.target))return;
-    if(fl.scrollTop===0) _ptrStartY=e.touches[0].clientY;
-  },{passive:true});
-  document.addEventListener('touchmove',e=>{
-    const fl=document.getElementById('feed-list');
-    if(!fl||!fl.contains(e.target)||_ptrDoing)return;
-    if(fl.scrollTop===0&&e.touches[0].clientY-_ptrStartY>60){
-      _ptrActive=true;
-      const ind=document.getElementById('ptr-indicator');
-      if(ind) ind.style.display='block';
-    }
-  },{passive:true});
-  document.addEventListener('touchend',()=>{
-    if(_ptrActive&&!_ptrDoing){
-      _ptrDoing=true;
-      loadFeed();
-      setTimeout(()=>{
-        const ind=document.getElementById('ptr-indicator');
-        if(ind) ind.style.display='none';
-        _ptrDoing=false;
-      },1200);
-    }
-    _ptrActive=false; _ptrStartY=0;
-  },{passive:true});
-})();
-
-// ═══════════════════════════════════════════════════════
-// OPEN POST LIGHTBOX BY ID (for profile grid)
-// ═══════════════════════════════════════════════════════
-async function openPostLightboxById(postId){
-  try{
-    const snap=await fs.getDoc(fs.doc(db,'posts',postId));
-    if(snap.exists()){
-      const post={id:snap.id,...snap.data()};
-      // Resolve "fs:DOCID" references to actual base64 before showing
-      const src = await resolveMedia(post.media_url);
-      openLightbox(src||post.media_url, post.caption, post);
-    }
-  }catch(e){}
-}
-
-// ═══════════════════════════════════════════════════════
-// OPEN POST LIGHTBOX FROM FEED (uses cached post data)
-// ═══════════════════════════════════════════════════════
-function openPostLightbox(postId){
-  // Try to find the post in the feed
-  const imgEl=document.getElementById('pi-'+postId);
-  const src=imgEl?imgEl.src:'';
-  // Get caption from DOM
-  const card=document.getElementById('post-card-'+postId);
-  if(!card){openPostLightboxById(postId);return;}
-  // Extract post info from card data attributes or just fetch
-  openPostLightboxById(postId);
-}
-
-// ═══════════════════════════════════════════════════════
-// CHAT PHOTO SENDING
-// ═══════════════════════════════════════════════════════
-function pickChatPhoto(){
-  const inp=document.getElementById('fi-chat-photo');
-  inp.value='';
-  inp.click();
-}
-async function onChatPhoto(e){
-  const file=e.target.files[0]; if(!file) return;
-  e.target.value='';
-  if(!CU||!_chatUid){ toast('Open a chat first'); return; }
-  toast('⏳ Sending photo...');
-  try{
-    const b64=await imgToBase64(file,800,0.85);
-    const cid=convId(CU.id,_chatUid);
-    const ts=fs.serverTimestamp();
-    await Promise.all([
-      fs.addDoc(fs.collection(db,'convs',cid,'msgs'),{uid:CU.id,img_url:b64,text:'',ts}),
-      fs.setDoc(fs.doc(db,'convs',cid),{
-        members:[CU.id,_chatUid],
-        names:{[CU.id]:CU.full_name,[_chatUid]:_chatName},
-        avatars:{[CU.id]:CU.avatar_url||'',[_chatUid]:_chatAvatar},
-        last:'📷 Photo',updated_at:ts,last_uid:CU.id,read_by:[CU.id]
-      },{merge:true})
-    ]);
-    toast('✅ Photo sent!');
-  }catch(e){ toast('❌ Could not send photo: '+e.message); console.error('onChatPhoto:',e); }
-}
-
-// ═══════════════════════════════════════════════════════
-// ONLINE PRESENCE
-// ═══════════════════════════════════════════════════════
-let _presenceUnsub=null;
-function setOnline(){
-  if(!CU||!db||!fs) return;
-  try{
-    fs.setDoc(fs.doc(db,'presence',CU.id),{uid:CU.id,online:true,last_seen:fs.serverTimestamp()},{merge:true});
-  }catch(e){console.warn('setOnline:',e);}
-  // Refresh every 45s to stay alive
-  if(!window._onlineInterval){
-    window._onlineInterval=setInterval(()=>{
-      if(CU&&db&&fs) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:true,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
-    },45000);
-  }
-  // Set offline when tab closes/hides
-  window.addEventListener('pagehide',()=>{
-    if(CU&&db&&fs) try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:false,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
-  },{once:true});
-  window.addEventListener('visibilitychange',()=>{
-    if(!CU||!db||!fs) return;
-    if(document.visibilityState==='hidden'){
-      try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:false,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
-    } else {
-      try{fs.setDoc(fs.doc(db,'presence',CU.id),{online:true,last_seen:fs.serverTimestamp()},{merge:true})}catch(e){}
-    }
-  });
-}
-function watchOnline(uid){
-  if(_presenceUnsub){_presenceUnsub();_presenceUnsub=null;}
-  const dot=document.getElementById('chat-online-dot');
-  const status=document.getElementById('chat-status');
-  if(dot) dot.style.display='none';
-  if(status){status.textContent='Tap to view profile';status.style.color='';}
-  if(!uid||!db||!fs) return;
-  try{
-    _presenceUnsub=fs.onSnapshot(fs.doc(db,'presence',uid),snap=>{
-      const dot2=document.getElementById('chat-online-dot');
-      const status2=document.getElementById('chat-status');
-      if(!snap||!snap.exists()){
-        if(dot2) dot2.style.display='none';
-        if(status2){status2.textContent='Tap to view profile';status2.style.color='';}
-        return;
-      }
-      const d=snap.data();
-      const isOnline=d.online===true;
-      if(dot2) dot2.style.display=isOnline?'block':'none';
-      if(status2){
-        if(isOnline){
-          status2.textContent='🟢 Online now';
-          status2.style.color='var(--G)';
-        } else {
-          const ls=d.last_seen?.toMillis?d.last_seen.toMillis():null;
-          status2.textContent=ls?'Last seen '+fmtTime(ls):'Offline';
-          status2.style.color='var(--muted)';
-        }
-      }
-    },err=>{console.warn('watchOnline error:',err);});
-  }catch(e){console.warn('watchOnline:',e);}
-}
-
-// ═══════════════════════════════════════════════════════
-// EDIT POST
-// ═══════════════════════════════════════════════════════
-let _editPostNewPhoto=null;
-function openEditPostModal(){
-  closeModal('post-action-modal');
-  if(!_activePostId||!CU||_activePostUid!==CU.id){toast('Cannot edit this post');return;}
-  // Load current data
-  fs.getDoc(fs.doc(db,'posts',_activePostId)).then(snap=>{
-    if(!snap.exists()) return;
-    const p=snap.data();
-    document.getElementById('ep-cap').value=p.caption||'';
-    // Show current image
-    const img=document.getElementById('ep-img');
-    const ph=document.getElementById('ep-placeholder');
-    _editPostNewPhoto=null;
-    if(p.media_url){
-      resolveMedia(p.media_url).then(src=>{
-        img.src=src||p.media_url; img.style.display='block'; ph.style.display='none';
-      });
-    } else { img.style.display='none'; ph.style.display='block'; }
-    openModal('edit-post-modal');
-  }).catch(()=>toast('Could not load post.'));
-}
-function pickEditPostPhoto(){
-  document.getElementById('fi-edit-post').click();
-}
-function onEditPostPhoto(e){
-  const file=e.target.files[0]; if(!file) return;
+function onCommPostPhoto(e){
+  const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=ev=>{
-    _editPostNewPhoto=file;
-    const img=document.getElementById('ep-img');
-    const ph=document.getElementById('ep-placeholder');
-    img.src=ev.target.result; img.style.display='block'; ph.style.display='none';
+    _commPostImg={dataUrl:ev.target.result,file};
+    $('comm-post-img-label').textContent='✅ Photo selected — '+file.name;
   };
   reader.readAsDataURL(file);
 }
-async function saveEditedPost(){
-  if(!_activePostId||!CU||_activePostUid!==CU.id){toast('Cannot edit this post');return;}
-  const btn=document.getElementById('ep-save-btn');
-  const cap=document.getElementById('ep-cap').value.trim();
-  btn.innerHTML='<span class="spin"></span> Saving...'; btn.disabled=true;
+
+async function submitCommPost(){
+  if(!CU||!_activeCommunity){return;}
+  const text=$('comm-post-text').value.trim();
+  if(!text&&!_commPostImg){toast('Write something or add a photo');return;}
+  const btn=$('comm-post-submit-btn');
+  btn.textContent='⏳ Posting...';btn.disabled=true;
   try{
-    const updates={caption:cap};
-    if(_editPostNewPhoto){
-      const mediaUrl=await uploadPostPhoto(_editPostNewPhoto,()=>{});
-      updates.media_url=mediaUrl;
-      // Clear image cache for old photo
-      delete _imgCache[(_activePostId||'')];
+    let imgUrl='';
+    if(_commPostImg){
+      imgUrl=await imgToBase64(_commPostImg.file,1080,0.92);
     }
-    await fs.updateDoc(fs.doc(db,'posts',_activePostId),updates);
-    btn.textContent='Save Changes ✓'; btn.disabled=false;
-    closeModal('edit-post-modal');
-    toast('✅ Post updated!');
-    loadFeed();
-  }catch(e){ toast('❌ Could not save: '+e.message); btn.textContent='Save Changes ✓'; btn.disabled=false; }
+    await fs.addDoc(fs.collection(db,'communities',_activeCommunity.id,'posts'),{
+      uid:CU.id, full_name:CU.full_name, username:CU.username,
+      avatar_url:CU.avatar_url||'', text, img_url:imgUrl,
+      likes:[], created_at:fs.serverTimestamp()
+    });
+    btn.textContent='Post to Group →';btn.disabled=false;
+    closeModal('comm-post-modal');
+    toast('✅ Posted!');
+    loadCommPosts(_activeCommunity.id);
+  }catch(e){
+    toast('❌ '+e.message);
+    btn.textContent='Post to Group →';btn.disabled=false;
+  }
 }
 
-// ═══════════════════════════════════════════════════════
-// PROFILE POSTS — show name above location
-// ═══════════════════════════════════════════════════════
-function profileToggleLike(btn){
-  var pid=btn.dataset.pid;
-  var wasLiked=(btn.dataset.lk==='true');
-  toggleLike(pid,wasLiked);
-  // Update data-lk for next tap
-  btn.dataset.lk=String(!wasLiked);
-}
 
 waitForFirebase();
 </script>
