@@ -97,6 +97,7 @@ textarea.inp{resize:none}
 
 /* TOPBAR */
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0;min-height:54px}
+.topbar-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--G2);flex:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 4px}
 .logo{font-family:'Syne',sans-serif;font-size:21px;font-weight:800;color:var(--G2)}
 .logo b{color:var(--G)}
 .ib{background:none;border:none;cursor:pointer;padding:10px;display:flex;align-items:center;justify-content:center;color:var(--G);border-radius:50%;-webkit-tap-highlight-color:transparent;min-width:44px;min-height:44px}
@@ -541,7 +542,7 @@ textarea.inp{resize:none}
       <img id="pp" alt=""/>
       <div class="pp"><div style="font-size:38px;">📷</div><div style="font-size:14px;color:var(--muted);">Tap to choose a photo</div><div style="font-size:12px;color:#b0bdb5;">Camera recommended</div></div>
     </div>
-    <div class="prog" id="prog"><div class="prog-f" id="prog-f"></div>
+    <div class="prog" id="prog"><div class="prog-f" id="prog-f"></div></div>
     <!-- Instagram-style ratio suggestions — shown after photo chosen -->
     <div class="photo-suggestions" id="photo-suggestions">
       <div class="ps-label">RESIZE FOR BEST FIT</div>
@@ -549,7 +550,7 @@ textarea.inp{resize:none}
       <div class="ps-btn" id="ps-square" onclick="applyRatio('1:1')"><span class="ratio">⬛</span>1:1 Square</div>
       <div class="ps-btn" id="ps-portrait" onclick="applyRatio('4:5')"><span class="ratio">📱</span>4:5 Portrait</div>
       <div class="ps-btn" id="ps-landscape" onclick="applyRatio('1.91:1')"><span class="ratio">🖼</span>Landscape</div>
-    </div></div>
+    </div>
     <div class="cf">
       <textarea class="inp" id="c-cap" placeholder="✍️ Write a caption..." rows="4" enterkeyhint="enter" inputmode="text" style="line-height:1.6;" onkeydown="event.stopPropagation()"></textarea>
       <div><div class="fl">CATEGORY</div>
@@ -1347,7 +1348,7 @@ function shareProfile(uid){
     );
   }
 }
-function openMaps(lat,lng){window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank')}
+function openMaps(lat,lng){const url=`https://www.google.com/maps?q=${lat},${lng}`;const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}
 
 // ── MAP ───────────────────────────────────────────────────
 function initMap(){
@@ -1559,6 +1560,53 @@ function openImgLightbox(url){
   openLightbox(url,'');
 }
 function closeLightbox(){$('lightbox').classList.remove('on');}
+
+// Open post photo in lightbox by postId
+async function openPostLightbox(postId){
+  const imgEl=$('pi-'+postId);
+  if(imgEl&&imgEl.src&&imgEl.style.display!=='none'){openLightbox(imgEl.src,'');return;}
+  try{
+    const snap=await fs.getDoc(fs.doc(db,'posts',postId));
+    if(snap.exists()&&snap.data().media_url){
+      const src=await resolveMedia(snap.data().media_url);
+      if(src){openLightbox(src,snap.data().caption||'');return;}
+    }
+  }catch(e){}
+  toast('Could not load photo.');
+}
+async function openPostLightboxById(postId){return openPostLightbox(postId);}
+
+// ── ONLINE PRESENCE ───────────────────────────────────────────────
+let _onlineInterval=null;
+function setOnline(){
+  if(!CU)return;
+  const uref=fs.doc(db,'users',CU.id);
+  const mark=()=>{try{fs.updateDoc(uref,{online:true,last_seen:fs.serverTimestamp()}).catch(()=>{});}catch(e){}};
+  mark();
+  clearInterval(_onlineInterval);
+  _onlineInterval=setInterval(mark,60000);
+  window.addEventListener('beforeunload',()=>{try{fs.updateDoc(uref,{online:false,last_seen:fs.serverTimestamp()}).catch(()=>{});}catch(e){}},{once:true});
+}
+let _onlineWatchUnsub=null;
+function watchOnline(uid){
+  if(_onlineWatchUnsub){_onlineWatchUnsub();_onlineWatchUnsub=null;}
+  const statusEl=$('chat-status');
+  const dotEl=$('chat-online-dot');
+  try{
+    _onlineWatchUnsub=fs.onSnapshot(fs.doc(db,'users',uid),snap=>{
+      if(!snap.exists()){if(statusEl)statusEl.textContent='';return;}
+      const d=snap.data();
+      if(d.online){
+        if(statusEl)statusEl.textContent='🟢 Online';
+        if(dotEl)dotEl.style.display='block';
+      } else {
+        if(dotEl)dotEl.style.display='none';
+        if(d.last_seen&&statusEl)statusEl.textContent='Last seen '+fmtTime(d.last_seen);
+        else if(statusEl)statusEl.textContent='';
+      }
+    },()=>{if(statusEl)statusEl.textContent='';if(dotEl)dotEl.style.display='none';});
+  }catch(e){if(statusEl)statusEl.textContent='';if(dotEl)dotEl.style.display='none';}
+}
 
 // ═══════════════════════════════════════════════════════
 //  DIRECT MESSAGES
@@ -2111,7 +2159,7 @@ async function scrollToPost(postId){
   }catch(e){toast('Could not load post.');}
 }
 
-function showPostModal(post){
+async function showPostModal(post){
   // Reuse lightbox-style overlay to show the single post
   const existing=document.getElementById('post-modal-bg');
   if(existing) existing.remove();
@@ -2132,8 +2180,7 @@ function showPostModal(post){
       </div>
       <button onclick="document.getElementById('post-modal-bg').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
     </div>
-    ${post.media_url?`<img src="${post.media_url}" style="width:100%;max-height:60vw;object-fit:cover;" alt="post"/>`:
-      `<div style="width:100%;height:200px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:56px;">${EMOJI[post.category]||'📸'}</div>`}
+    <div id="post-modal-photo-wrap" style="width:100%;min-height:200px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:56px;">${EMOJI[post.category]||'📸'}</div>
     ${post.caption?`<div style="padding:10px 14px;font-size:14px;line-height:1.5;">${esc(post.caption)}</div>`:''}
     <div style="display:flex;align-items:center;padding:6px 10px;gap:4px;">
       <button class="ab ${liked?'liked':''}" onclick="toggleLike('${post.id}',${liked})">
@@ -2146,6 +2193,18 @@ function showPostModal(post){
     </div>
   </div>`;
   document.getElementById('app').appendChild(bg);
+  // Resolve fs: media URL after DOM is ready
+  if(post.media_url){
+    const wrap=document.getElementById('post-modal-photo-wrap');
+    if(wrap){
+      resolveMedia(post.media_url).then(src=>{
+        if(src&&wrap){
+          wrap.style.fontSize='';wrap.style.minHeight='';
+          wrap.innerHTML='<img src="'+src+'" style="width:100%;max-height:65vw;object-fit:cover;display:block;" alt="post" onclick="openLightbox(this.src,\'\')"/>';
+        }
+      }).catch(()=>{});
+    }
+  }
 }
 
 function boot(){
@@ -2170,6 +2229,57 @@ function waitForFirebase(attempt=0){
   if(window._fbReady){boot()}
   else if(attempt<40){setTimeout(()=>waitForFirebase(attempt+1),150)}
   else{showPage('pg-login');toast('⚠️ Could not connect. Check your internet.')}
+}
+
+// ── MISSING STUBS ────────────────────────────────────────────────
+
+// Feed scroll — load more posts on near-bottom (currently feed uses onSnapshot so just a stub)
+function onFeedScroll(el){
+  // Pull-to-refresh feel: nothing needed since onSnapshot keeps feed live
+  // Future: pagination could go here
+}
+
+// Profile page like toggle
+async function profileToggleLike(btn){
+  if(!CU){toast('Sign in to like posts');return;}
+  const postId=btn.dataset.pid;
+  const wasLiked=btn.dataset.lk==='true';
+  const now=!wasLiked;
+  btn.classList.toggle('liked',now);
+  btn.dataset.lk=String(now);
+  const svg=btn.querySelector('svg');
+  if(svg){svg.setAttribute('fill',now?'var(--red)':'none');svg.setAttribute('stroke',now?'var(--red)':'currentColor');}
+  const span=btn.querySelector('span');
+  if(span)span.textContent=fmtN(Math.max(0,(parseInt(span.textContent)||0)+(now?1:-1)));
+  try{
+    await fs.updateDoc(fs.doc(db,'posts',postId),{likes:now?fs.arrayUnion(CU.id):fs.arrayRemove(CU.id)});
+  }catch(e){console.warn('profileToggleLike:',e);}
+}
+
+// Chat photo — pick image and send in chat
+function pickChatPhoto(){$('fi-chat-photo').click();}
+function onChatPhoto(e){
+  const file=e.target.files[0];if(!file||!CU||!_chatUid)return;
+  e.target.value='';
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    try{
+      // Compress to 800px for chat
+      const b64=await imgToBase64(file,800,0.85);
+      const cid=convId(CU.id,_chatUid);
+      const ts=fs.serverTimestamp();
+      await Promise.all([
+        fs.addDoc(fs.collection(db,'convs',cid,'msgs'),{uid:CU.id,img_url:b64,ts}),
+        fs.setDoc(fs.doc(db,'convs',cid),{
+          members:[CU.id,_chatUid],
+          names:{[CU.id]:CU.full_name,[_chatUid]:_chatName},
+          avatars:{[CU.id]:CU.avatar_url||'',[_chatUid]:_chatAvatar},
+          last:'📷 Photo',updated_at:ts,last_uid:CU.id,read_by:[CU.id]
+        },{merge:true})
+      ]);
+    }catch(e){toast('Could not send photo.');}
+  };
+  reader.readAsDataURL(file);
 }
 // ═══════════════════════════════════════════════════════════════════
 //  PHOTO RATIO SYSTEM (Instagram-style)
