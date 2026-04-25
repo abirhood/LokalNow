@@ -131,7 +131,7 @@ textarea.inp{resize:none}
 .ab.liked{color:var(--red)}
 .ab.liked svg{fill:var(--red);stroke:var(--red)}
 .go-btn{margin-left:auto;display:flex;align-items:center;gap:4px;background:var(--G);color:#fff;border:none;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent;min-height:40px}
-.cap{padding:2px 13px 13px;font-size:14px;line-height:1.5}
+.cap{padding:2px 13px 13px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
 .cap b{font-weight:700}
 
 /* COMMENTS */
@@ -1118,6 +1118,7 @@ function doLogout(){
 function launchApp(){
   $('nav').classList.add('on');if(CU)window._currentUID=CU.id;
   getLocation();showPage('pg-feed');
+  initPullToRefresh();
   // Check for pending deep link after login
   const pendingPost = sessionStorage.getItem('pending_post');
   const pendingUser = sessionStorage.getItem('pending_user');
@@ -1206,11 +1207,12 @@ function renderFeed(posts){
         </button>
       </div>
       ${post.ai_flag?'<div class="ai-warn">⚠️ AI-generated content detected — under review</div>':''}
-      <div class="pi-wrap" onclick="openPostLightbox('${post.id}')" style="cursor:pointer;">
+      ${post.media_url?`<div class="pi-wrap" onclick="openPostLightbox('${post.id}')" style="cursor:pointer;">
         <div class="pi-ph" id="ph-${post.id}">${EMOJI[post.category]||'📸'}</div>
         <img class="pi" id="pi-${post.id}" alt="" style="display:none;"/>
         ${!post.ai_flag?'<div class="ob">✅ ORIGINAL</div>':''}
-      </div>
+      </div>`:`<div style="padding:10px 13px 2px;font-size:28px;">${EMOJI[post.category]||'📝'}</div>`}
+      ${post.caption?`<div class="cap">${esc(post.caption)}</div>`:''}
       <div class="pa">
         <button class="ab${liked?' liked':''}" id="lb-${post.id}" onclick="toggleLike('${post.id}',${liked})">
           <svg viewBox="0 0 24 24" stroke-width="2"${liked?' fill="var(--red)"':''}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -1225,7 +1227,6 @@ function renderFeed(posts){
         </button>
         ${post.latitude?`<button class="go-btn" onclick="openMaps(${post.latitude},${post.longitude})"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="width:13px;height:13px;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>Go There</button>`:''}
       </div>
-      ${post.caption?`<div class="cap">${esc(post.caption)}</div>`:''}
       <div class="cmts" id="cm-${post.id}">
         <div class="cmt-list" id="cml-${post.id}"></div>
         <div class="cmt-row">
@@ -1348,7 +1349,24 @@ function shareProfile(uid){
     );
   }
 }
-function openMaps(lat,lng){const url=`https://www.google.com/maps?q=${lat},${lng}`;const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}
+function openMaps(lat,lng){
+  if(!lat||!lng){toast('📍 No location data for this post');return;}
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid=/Android/.test(navigator.userAgent);
+  const gMaps=`https://www.google.com/maps?q=${lat},${lng}`;
+  let url=gMaps;
+  if(isIOS) url=`maps://?q=${lat},${lng}`;
+  else if(isAndroid) url=`geo:${lat},${lng}?q=${lat},${lng}`;
+  const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  // Fallback: if native scheme doesn't open (desktop), open Google Maps after short delay
+  if(isIOS||isAndroid){
+    setTimeout(()=>{
+      const fb=document.createElement('a');fb.href=gMaps;fb.target='_blank';fb.rel='noopener noreferrer';
+      document.body.appendChild(fb);fb.click();document.body.removeChild(fb);
+    },800);
+  }
+}
 
 // ── MAP ───────────────────────────────────────────────────
 function initMap(){
@@ -1410,8 +1428,8 @@ function pickCat(el,cat){document.querySelectorAll('#ctags .ctag').forEach(c=>c.
 
 async function submitPost(){
   if(!CU){toast('Please sign in first');return}
-  if(!chosenPostPhoto){toast('📷 Please pick a photo first');return}
   const cap=$('c-cap').value.trim();
+  if(!chosenPostPhoto&&!cap){toast('✍️ Write a caption or add a photo');return}
   const btn=$('post-btn');btn.textContent='⏳ Getting location...';btn.disabled=true;
   const prog=$('prog'),fill=$('prog-f');prog.style.display='block';fill.style.width='5%';
 
@@ -1426,7 +1444,12 @@ async function submitPost(){
 
   btn.textContent='⏳ Saving...';fill.style.width='10%';
   try{
-    const mediaUrl=await uploadPostPhoto(chosenPostPhoto.file,pct=>{fill.style.width=pct+'%'});
+    let mediaUrl='';
+    if(chosenPostPhoto){
+      mediaUrl=await uploadPostPhoto(chosenPostPhoto.file,pct=>{fill.style.width=pct+'%'});
+    } else {
+      fill.style.width='80%';
+    }
     const postData={uid:CU.id,full_name:CU.full_name,username:CU.username,avatar_url:CU.avatar_url||'',city:CU.city,location_name:userLoc?.name||CU.city||'Local',latitude:userLoc?.lat||null,longitude:userLoc?.lng||null,caption:cap,category:chosenCat||'other',privacy:_postPrivacy||'public',media_url:mediaUrl,likes:[],comments_count:0,verification_level:CU.verification_level||'basic',is_trusted_local:CU.is_trusted_local||false,ai_flag:false,created_at:fs.serverTimestamp()};
     await fs.addDoc(fs.collection(db,'posts'),postData);
     try{await fs.updateDoc(fs.doc(db,'users',CU.id),{posts_count:fs.increment(1)})}catch(e){}
@@ -2233,11 +2256,34 @@ function waitForFirebase(attempt=0){
 
 // ── MISSING STUBS ────────────────────────────────────────────────
 
-// Feed scroll — load more posts on near-bottom (currently feed uses onSnapshot so just a stub)
-function onFeedScroll(el){
-  // Pull-to-refresh feel: nothing needed since onSnapshot keeps feed live
-  // Future: pagination could go here
+// ── PULL-TO-REFRESH ──────────────────────────────────────────────
+let _ptrStartY=0,_ptrActive=false,_ptrTriggered=false;
+function initPullToRefresh(){
+  const el=$('feed-list');
+  const ind=$('ptr-indicator');
+  if(!el||!ind)return;
+  el.addEventListener('touchstart',e=>{
+    if(el.scrollTop===0){_ptrStartY=e.touches[0].clientY;_ptrActive=true;_ptrTriggered=false;}
+  },{passive:true});
+  el.addEventListener('touchmove',e=>{
+    if(!_ptrActive)return;
+    const dy=e.touches[0].clientY-_ptrStartY;
+    if(dy>60&&!_ptrTriggered&&el.scrollTop===0){
+      _ptrTriggered=true;
+      ind.style.display='block';
+    }
+  },{passive:true});
+  el.addEventListener('touchend',()=>{
+    if(_ptrTriggered){
+      loadFeed();
+      setTimeout(()=>{ind.style.display='none';},1200);
+    }
+    _ptrActive=false;_ptrTriggered=false;
+  });
 }
+
+// Feed scroll — stub (feed is live via onSnapshot; PTR handled by touch events above)
+function onFeedScroll(el){}
 
 // Profile page like toggle
 async function profileToggleLike(btn){
